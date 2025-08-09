@@ -27,7 +27,7 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
 
   const base = `${req.protocol}://${req.get('host')}`;
   const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-  const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : undefined;
+  const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
 
   // Basic required validations
   const missing = [];
@@ -71,8 +71,9 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
       contactName: req.body.contactName || '',
       phone: req.body.phone || '',
   availableFrom: new Date(req.body.availableFrom),
-      photoUrls,
-      videoUrl,
+    photoUrls,
+  videoUrl,
+    sizeSqft: req.body.sizeSqft ? Number(req.body.sizeSqft) : 0,
     };
     const listing = new Listing(payload);
     const saved = await listing.save();
@@ -198,10 +199,13 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
   if (typeof req.body.utilitiesIncluded !== 'undefined') doc.utilitiesIncluded = req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean);
   if (typeof req.body.contactName !== 'undefined') doc.contactName = req.body.contactName;
   if (typeof req.body.phone !== 'undefined') doc.phone = req.body.phone;
+  if (typeof req.body.sizeSqft !== 'undefined') doc.sizeSqft = Number(req.body.sizeSqft) || 0;
 
     doc.photoUrls = [...keep, ...newPhotoUrls];
     if (req.files?.video?.[0]) {
       doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
+    } else if (req.body.removeVideo === 'true') {
+      doc.videoUrl = '';
     }
 
     // Validate required fields after applying changes
