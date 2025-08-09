@@ -48,8 +48,8 @@ export default function Listings() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>My Listings</h2>
+      <div className="listings-header">
+        <h2>My Listings</h2>
         <div className="segmented">
           <button className={`seg ${statusSeg === 'all' ? 'active' : ''}`} onClick={() => setStatusSeg('all')}>All</button>
           <button className={`seg ${statusSeg === 'available' ? 'active' : ''}`} onClick={() => setStatusSeg('available')}>Available</button>
@@ -63,9 +63,9 @@ export default function Listings() {
           <button className={`seg ${typeSeg === 'Commercial' ? 'active' : ''}`} onClick={() => setTypeSeg('Commercial')}>Commercial</button>
           <button className={`seg ${typeSeg === 'Hostel' ? 'active' : ''}`} onClick={() => setTypeSeg('Hostel')}>Hostel</button>
         </div>
-        <Link to="/add" style={{ marginLeft: 'auto' }}>
-          <button className="btn">Add Listing</button>
-        </Link>
+        <div className="header-actions">
+          <Link to="/add"><button className="btn">Add Listing</button></Link>
+        </div>
       </div>
 
       {loading ? (

@@ -4,14 +4,13 @@ const Listing = require('../models/listings');
 const multer = require('multer');
 const path = require('path');
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// Dummy auth: take user id from header 'x-user-id' or query '?userId='
+// --------------------------------------------------
+// Helpers & upload config
+// --------------------------------------------------
 function getUserId(req) {
   return (req.headers['x-user-id'] || req.query.userId || '').toString();
 }
 
-// Multer setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
   filename: (req, file, cb) => {
@@ -21,14 +20,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-// Create listing (requires userId)
+// --------------------------------------------------
+// Create listing (owner required)
+// --------------------------------------------------
 router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
-=======
-=======
->>>>>>> Stashed changes
-// ✅ Create listing
-router.post('/', async (req, res) => {
->>>>>>> Stashed changes
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(400).json({ error: 'userId required' });
@@ -91,118 +86,136 @@ router.post('/', async (req, res) => {
   }
 });
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// Get current user's listings (if userId provided); otherwise all (for browsing)
+// --------------------------------------------------
+// Basic get (optionally restricted to user via header) - kept for existing UI
+// --------------------------------------------------
 router.get('/', async (req, res) => {
   try {
     const userId = getUserId(req);
     const filter = userId ? { userId } : {};
     const listings = await Listing.find(filter).sort({ createdAt: -1 });
-=======
-// ✅ Get listings with filters
-router.get('/', async (req, res) => {
-  try {
-=======
-// ✅ Get listings with filters
-router.get('/', async (req, res) => {
-  try {
->>>>>>> Stashed changes
-    const { location, priceMin, priceMax, type, title } = req.query;
-    const filters = {};
-
-    if (location) {
-      filters.location = { $regex: location, $options: 'i' };
-    }
-
-    if (title) {
-      filters.title = { $regex: title, $options: 'i' };
-    }
-
-    if (type) {
-      filters.type = type;
-    }
-
-    if (priceMin || priceMax) {
-      filters.price = {};
-      if (priceMin) filters.price.$gte = parseFloat(priceMin);
-      if (priceMax) filters.price.$lte = parseFloat(priceMax);
-    } 
-
-    const listings = await Listing.find(filters);
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     res.json(listings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+// --------------------------------------------------
+// Advanced search endpoint (public browse)
+// Query params:
+// q=keyword (title/description)
+// type=Apartment[,Room,...]
+// division=Dhaka&district=... etc (exact match)
+// priceMin= & priceMax=
+// roomsMin= & roomsMax=
+// page=1&limit=20
+// sort=price_asc|price_desc|newest|oldest
+// --------------------------------------------------
+router.get('/search', async (req, res) => {
+  try {
+    const {
+      q,
+      type,
+      division,
+      district,
+      subdistrict,
+      area,
+      priceMin,
+      priceMax,
+      roomsMin,
+      roomsMax,
+      page = '1',
+      limit = '20',
+      sort = 'newest',
+      isRented,
+    } = req.query;
+
+    const filter = {};
+
+    // Keyword (regex OR). For larger scale consider a text index and $text.
+    if (q && q.trim()) {
+      const kw = q.trim();
+      filter.$or = [
+        { title: { $regex: kw, $options: 'i' } },
+        { description: { $regex: kw, $options: 'i' } },
+        { area: { $regex: kw, $options: 'i' } },
+        { subdistrict: { $regex: kw, $options: 'i' } },
+        { district: { $regex: kw, $options: 'i' } },
+        { division: { $regex: kw, $options: 'i' } },
+      ];
+    }
+
+    // Multi / single type
+    if (type) {
+      const types = type.split(',').map(t => t.trim()).filter(Boolean);
+      if (types.length === 1) filter.type = types[0];
+      else if (types.length > 1) filter.type = { $in: types };
+    }
+
+    // Exact location filters (cascading)
+    if (division) filter.division = division;
+    if (district) filter.district = district;
+    if (subdistrict) filter.subdistrict = subdistrict;
+    if (area) filter.area = area;
+
+    // Price range
+    if (priceMin || priceMax) {
+      filter.price = {};
+      if (priceMin) filter.price.$gte = Number(priceMin);
+      if (priceMax) filter.price.$lte = Number(priceMax);
+    }
+
+    // Rooms range
+    if (roomsMin || roomsMax) {
+      filter.rooms = {};
+      if (roomsMin) filter.rooms.$gte = Number(roomsMin);
+      if (roomsMax) filter.rooms.$lte = Number(roomsMax);
+    }
+
+    if (typeof isRented !== 'undefined') {
+      if (isRented === 'true') filter.isRented = true; else if (isRented === 'false') filter.isRented = false;
+    }
+
+    // Pagination
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sorting
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt: 1 },
+      price_asc: { price: 1 },
+      price_desc: { price: -1 },
+    };
+    const sortOpt = sortMap[sort] || sortMap.newest;
+
+    const [data, total] = await Promise.all([
+      Listing.find(filter).sort(sortOpt).skip(skip).limit(limitNum),
+      Listing.countDocuments(filter),
+    ]);
+
+    res.json({
+      data,
+      page: pageNum,
+      pageSize: data.length,
+      limit: limitNum,
+      total,
+      hasMore: skip + data.length < total,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --------------------------------------------------
 // Get single listing
+// --------------------------------------------------
 router.get('/:id', async (req, res) => {
-=======
-=======
->>>>>>> Stashed changes
-// ✅ Update listing
-router.put('/:id', async (req, res) => {
->>>>>>> Stashed changes
   try {
     const doc = await Listing.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'Not found' });
     res.json(doc);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Search listings with various filters
-router.get('/', async (req, res) => {
-  try {
-    const userId = getUserId(req);
-    const filter = {};
-
-    // If userId provided, limit to that user's listings
-    if (userId) filter.userId = userId;
-
-    // Keyword search
-    if (req.query.search) {
-      const keyword = req.query.search.trim();
-      filter.$or = [
-        { title: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } }
-      ];
-    }
-
-    // Type filter
-    if (req.query.type) {
-      filter.type = req.query.type;
-    }
-
-    // Location filters
-    ['division', 'district', 'subdistrict', 'area'].forEach((field) => {
-      if (req.query[field]) {
-        filter[field] = req.query[field];
-      }
-    });
-
-    // Price range filter
-    if (req.query.priceMin || req.query.priceMax) {
-      filter.price = {};
-      if (req.query.priceMin) filter.price.$gte = Number(req.query.priceMin);
-      if (req.query.priceMax) filter.price.$lte = Number(req.query.priceMax);
-    }
-
-    // Rooms filter
-    if (req.query.rooms) {
-      filter.rooms = Number(req.query.rooms);
-    }
-
-    const listings = await Listing.find(filter).sort({ createdAt: -1 });
-    res.json(listings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -290,15 +303,9 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
   }
 });
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// Delete listing (only by owner)
-=======
-// ✅ Delete listing
->>>>>>> Stashed changes
-=======
-// ✅ Delete listing
->>>>>>> Stashed changes
+// --------------------------------------------------
+// Delete listing (owner only)
+// --------------------------------------------------
 router.delete('/:id', async (req, res) => {
   try {
     const userId = getUserId(req);
