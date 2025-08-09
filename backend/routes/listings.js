@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Dummy auth: take user id from header 'x-user-id' or query '?userId='
 function getUserId(req) {
   return (req.headers['x-user-id'] || req.query.userId || '').toString();
@@ -23,6 +24,8 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 // Create listing (requires userId)
 router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
 =======
+=======
+>>>>>>> Stashed changes
 // ✅ Create listing
 router.post('/', async (req, res) => {
 >>>>>>> Stashed changes
@@ -89,6 +92,7 @@ router.post('/', async (req, res) => {
 });
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Get current user's listings (if userId provided); otherwise all (for browsing)
 router.get('/', async (req, res) => {
   try {
@@ -99,6 +103,11 @@ router.get('/', async (req, res) => {
 // ✅ Get listings with filters
 router.get('/', async (req, res) => {
   try {
+=======
+// ✅ Get listings with filters
+router.get('/', async (req, res) => {
+  try {
+>>>>>>> Stashed changes
     const { location, priceMin, priceMax, type, title } = req.query;
     const filters = {};
 
@@ -121,6 +130,9 @@ router.get('/', async (req, res) => {
     } 
 
     const listings = await Listing.find(filters);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     res.json(listings);
   } catch (err) {
@@ -129,9 +141,12 @@ router.get('/', async (req, res) => {
 });
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Get single listing
 router.get('/:id', async (req, res) => {
 =======
+=======
+>>>>>>> Stashed changes
 // ✅ Update listing
 router.put('/:id', async (req, res) => {
 >>>>>>> Stashed changes
@@ -276,7 +291,11 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
 });
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Delete listing (only by owner)
+=======
+// ✅ Delete listing
+>>>>>>> Stashed changes
 =======
 // ✅ Delete listing
 >>>>>>> Stashed changes
