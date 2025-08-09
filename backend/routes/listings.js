@@ -105,6 +105,55 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Search listings with various filters
+router.get('/', async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const filter = {};
+
+    // If userId provided, limit to that user's listings
+    if (userId) filter.userId = userId;
+
+    // Keyword search
+    if (req.query.search) {
+      const keyword = req.query.search.trim();
+      filter.$or = [
+        { title: { $regex: keyword, $options: 'i' } },
+        { description: { $regex: keyword, $options: 'i' } }
+      ];
+    }
+
+    // Type filter
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+
+    // Location filters
+    ['division', 'district', 'subdistrict', 'area'].forEach((field) => {
+      if (req.query[field]) {
+        filter[field] = req.query[field];
+      }
+    });
+
+    // Price range filter
+    if (req.query.priceMin || req.query.priceMax) {
+      filter.price = {};
+      if (req.query.priceMin) filter.price.$gte = Number(req.query.priceMin);
+      if (req.query.priceMax) filter.price.$lte = Number(req.query.priceMax);
+    }
+
+    // Rooms filter
+    if (req.query.rooms) {
+      filter.rooms = Number(req.query.rooms);
+    }
+
+    const listings = await Listing.find(filter).sort({ createdAt: -1 });
+    res.json(listings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Update listing (only by owner)
 router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
@@ -197,5 +246,6 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 module.exports = router;
