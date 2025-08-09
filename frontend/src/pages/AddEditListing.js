@@ -30,6 +30,7 @@ export default function AddEditListing() {
   const [videoUrl, setVideoUrl] = useState(''); // existing video url
   const [newVideo, setNewVideo] = useState(null); // File | null
   const [dragActive, setDragActive] = useState(false);
+  const [removeVideo, setRemoveVideo] = useState(false);
   const maxPhotos = 12;
 
   const keepCount = useMemo(
@@ -62,10 +63,25 @@ export default function AddEditListing() {
           area: data.area || '',
           road: data.road || '',
           houseNo: data.houseNo || '',
+          // Pricing & terms
+          deposit: data.deposit ?? '',
+          serviceCharge: data.serviceCharge ?? '',
+          negotiable: !!data.negotiable,
+          // Extra details
+          floor: data.floor ?? '',
+          totalFloors: data.totalFloors ?? '',
+          furnishing: data.furnishing || 'Unfurnished',
+          utilitiesIncluded: (data.utilitiesIncluded || []).join(', '),
+          sizeSqft: data.sizeSqft ?? '',
+          // Contact
+          contactName: data.contactName || '',
+          phone: data.phone || '',
         });
         setExistingPhotos(data.photoUrls || []);
         setKeepPhoto(Object.fromEntries((data.photoUrls || []).map((u) => [u, true])));
         setVideoUrl(data.videoUrl || '');
+        setNewVideo(null);
+        setRemoveVideo(false);
       } catch (e) {
         alert('Failed to load listing');
       }
@@ -124,15 +140,32 @@ export default function AddEditListing() {
 
   const onPickVideo = (e) => {
     const file = e.target.files?.[0];
-    setNewVideo(file || null);
+  setNewVideo(file || null);
+  if (file) setRemoveVideo(false); // replacing existing video
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    // Require at least 1 photo (kept existing + new)
+    // Client-side validations to match server
+    const errs = [];
     const totalPhotos = existingPhotos.filter((u) => keepPhoto[u]).length + newPhotos.length;
-    if (totalPhotos < 1) {
-      alert('Please add at least one photo.');
+    if (!form.title || !form.title.trim()) errs.push('Title');
+    const priceNum = Number(form.price);
+    if (!Number.isFinite(priceNum)) errs.push('Price');
+    if (!form.type) errs.push('Listing Type');
+    if (!form.availableFrom) errs.push('Available From');
+    const roomsNum = Number(form.rooms);
+    if (!Number.isFinite(roomsNum) || roomsNum < 0) errs.push('Rooms');
+    const floorNum = Number(form.floor);
+    if (!Number.isFinite(floorNum) || floorNum < 0) errs.push('Floor');
+    if (!form.division) errs.push('Division');
+    if (!form.district) errs.push('District');
+    if (!form.subdistrict) errs.push('Subdistrict');
+    if (!form.area) errs.push('Area');
+    if (!form.phone || !form.phone.trim()) errs.push('Phone');
+    if (totalPhotos < 1) errs.push('At least 1 Photo');
+    if (errs.length) {
+      alert(`Please fill required fields:\n- ${errs.join('\n- ')}`);
       return;
     }
     setLoading(true);
@@ -163,6 +196,7 @@ export default function AddEditListing() {
         totalFloors: String(Number(form.totalFloors || 0)),
         furnishing: form.furnishing || 'Unfurnished',
         utilitiesIncluded: form.utilitiesIncluded || '',
+  sizeSqft: String(Number(form.sizeSqft || 0)),
         contactName: form.contactName || '',
         phone: form.phone || '',
       };
@@ -171,17 +205,36 @@ export default function AddEditListing() {
       // Existing photos to keep
       const keepUrls = existingPhotos.filter((u) => keepPhoto[u]);
       fd.append('existingPhotoUrls', JSON.stringify(keepUrls));
-      // New photos
-      newPhotos.forEach((file) => fd.append('photos', file));
+      // New photos (filter obviously large files ~10MB per file to avoid network aborts)
+      const PHOTO_MAX = 10 * 1024 * 1024;
+      newPhotos.forEach((file) => {
+        if (file.size > PHOTO_MAX) return; // silently skip too-large files
+        fd.append('photos', file);
+      });
       // Optional new video (replace old)
-      if (newVideo) fd.append('video', newVideo);
+  if (newVideo) {
+        const VIDEO_MAX = 50 * 1024 * 1024;
+        if (newVideo.size <= VIDEO_MAX) fd.append('video', newVideo);
+      }
+  // Remove existing video if requested
+  fd.append('removeVideo', String(!!removeVideo));
 
       const headers = { 'x-user-id': user.id };
       if (id) await axios.put(`/api/listings/${id}`, fd, { headers });
       else await axios.post('/api/listings', fd, { headers });
       navigate('/');
     } catch (e) {
-      alert('Save failed');
+      const status = e?.response?.status;
+      const data = e?.response?.data;
+      const fields = Array.isArray(data?.fields) ? `\nFields: ${data.fields.join(', ')}` : '';
+      let msg = data?.error || e?.message || 'Save failed';
+      if (msg && msg.toLowerCase().includes('network')) {
+        msg = 'Network error: Upload may be too large or server unreachable. Try smaller files or check the server.';
+      }
+      alert(`${msg}${fields}`);
+      // Helpful for debugging in dev
+      // eslint-disable-next-line no-console
+      console.error('Save error:', { status, data, error: e });
     } finally {
       setLoading(false);
     }
@@ -340,15 +393,28 @@ export default function AddEditListing() {
             </label>
           </div>
           {newVideo ? (
-            <p style={{ fontSize: 12, color: '#666' }}>{newVideo.name}</p>
-          ) : videoUrl ? (
-            <video src={videoUrl} controls style={{ width: '100%', maxHeight: 240 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <p style={{ fontSize: 12, color: '#666', margin: 0 }}>{newVideo.name}</p>
+              <button type="button" className="btn ghost" onClick={() => setNewVideo(null)}>Remove</button>
+            </div>
+          ) : videoUrl && !removeVideo ? (
+            <div>
+              <video src={videoUrl} controls style={{ width: '100%', maxHeight: 240 }} />
+              <div style={{ marginTop: 6 }}>
+                <button type="button" className="btn danger" onClick={() => setRemoveVideo(true)}>Remove video</button>
+              </div>
+            </div>
+          ) : removeVideo ? (
+            <div className="badge" style={{ width: 'fit-content' }}>
+              Video will be removed on save
+              <button type="button" className="icon-btn" style={{ marginLeft: 8 }} onClick={() => setRemoveVideo(false)}>Undo</button>
+            </div>
           ) : null}
         </div>
         {isEdit && (
-          <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <label className="inline-field">
             <input type="checkbox" name="isRented" checked={form.isRented} onChange={onChange} />
-            Mark as rented
+            <span>Mark as rented</span>
           </label>
         )}
 
@@ -364,9 +430,9 @@ export default function AddEditListing() {
               Service charge
               <input type="number" name="serviceCharge" min="0" step="1" value={form.serviceCharge || ''} onChange={onChange} />
             </label>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <label className="inline-field" style={{ gap: 6 }}>
               <input type="checkbox" name="negotiable" checked={!!form.negotiable} onChange={onChange} />
-              Negotiable
+              <span>Negotiable</span>
             </label>
           </div>
         </div>
@@ -382,6 +448,10 @@ export default function AddEditListing() {
             <label>
               Total floors
               <input type="number" name="totalFloors" min="0" step="1" value={form.totalFloors || ''} onChange={onChange} />
+            </label>
+            <label>
+              Size (sq ft)
+              <input type="number" name="sizeSqft" min="0" step="1" value={form.sizeSqft || ''} onChange={onChange} />
             </label>
             <label>
               Furnishing
