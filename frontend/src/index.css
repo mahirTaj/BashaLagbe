@@ -52,6 +52,20 @@ a { color: inherit; text-decoration: none; }
 label { font-size: 13px; color: #374151; margin-bottom: 6px; display: block; }
 input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; outline: none; background: #fff; }
 input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
+/* Do not apply text-input styles to checkboxes/radios */
+input[type="checkbox"], input[type="radio"] {
+  width: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  accent-color: var(--primary);
+}
+/* Keep label and control close together */
+.inline-field input[type="checkbox"], .inline-field input[type="radio"] {
+  margin: 0;
+}
 .help { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: #f9fafb; font-size: 12px; color: #374151; }
 .badge.req { border-color: #fecaca; color: #b91c1c; background: #fff1f2; }

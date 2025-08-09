@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const fs = require('fs');
 
 const listingsRoute = require('./routes/listings');
 
@@ -12,7 +13,9 @@ app.use(cors());
 app.use(express.json());
 
 // Serve uploaded assets
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsPath = path.join(__dirname, 'uploads');
+try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
+app.use('/uploads', express.static(uploadsPath));
 
 app.use('/api/listings', listingsRoute);
 
