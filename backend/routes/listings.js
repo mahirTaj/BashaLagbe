@@ -4,6 +4,8 @@ const Listing = require('../models/listings');
 const multer = require('multer');
 const path = require('path');
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Dummy auth: take user id from header 'x-user-id' or query '?userId='
 function getUserId(req) {
   return (req.headers['x-user-id'] || req.query.userId || '').toString();
@@ -21,6 +23,12 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // Create listing (requires userId)
 router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+=======
+=======
+>>>>>>> Stashed changes
+// ✅ Create listing
+router.post('/', async (req, res) => {
+>>>>>>> Stashed changes
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(400).json({ error: 'userId required' });
@@ -83,24 +91,118 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
   }
 });
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Get current user's listings (if userId provided); otherwise all (for browsing)
 router.get('/', async (req, res) => {
   try {
     const userId = getUserId(req);
     const filter = userId ? { userId } : {};
     const listings = await Listing.find(filter).sort({ createdAt: -1 });
+=======
+// ✅ Get listings with filters
+router.get('/', async (req, res) => {
+  try {
+=======
+// ✅ Get listings with filters
+router.get('/', async (req, res) => {
+  try {
+>>>>>>> Stashed changes
+    const { location, priceMin, priceMax, type, title } = req.query;
+    const filters = {};
+
+    if (location) {
+      filters.location = { $regex: location, $options: 'i' };
+    }
+
+    if (title) {
+      filters.title = { $regex: title, $options: 'i' };
+    }
+
+    if (type) {
+      filters.type = type;
+    }
+
+    if (priceMin || priceMax) {
+      filters.price = {};
+      if (priceMin) filters.price.$gte = parseFloat(priceMin);
+      if (priceMax) filters.price.$lte = parseFloat(priceMax);
+    } 
+
+    const listings = await Listing.find(filters);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
     res.json(listings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Get single listing
 router.get('/:id', async (req, res) => {
+=======
+=======
+>>>>>>> Stashed changes
+// ✅ Update listing
+router.put('/:id', async (req, res) => {
+>>>>>>> Stashed changes
   try {
     const doc = await Listing.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'Not found' });
     res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Search listings with various filters
+router.get('/', async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const filter = {};
+
+    // If userId provided, limit to that user's listings
+    if (userId) filter.userId = userId;
+
+    // Keyword search
+    if (req.query.search) {
+      const keyword = req.query.search.trim();
+      filter.$or = [
+        { title: { $regex: keyword, $options: 'i' } },
+        { description: { $regex: keyword, $options: 'i' } }
+      ];
+    }
+
+    // Type filter
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+
+    // Location filters
+    ['division', 'district', 'subdistrict', 'area'].forEach((field) => {
+      if (req.query[field]) {
+        filter[field] = req.query[field];
+      }
+    });
+
+    // Price range filter
+    if (req.query.priceMin || req.query.priceMax) {
+      filter.price = {};
+      if (req.query.priceMin) filter.price.$gte = Number(req.query.priceMin);
+      if (req.query.priceMax) filter.price.$lte = Number(req.query.priceMax);
+    }
+
+    // Rooms filter
+    if (req.query.rooms) {
+      filter.rooms = Number(req.query.rooms);
+    }
+
+    const listings = await Listing.find(filter).sort({ createdAt: -1 });
+    res.json(listings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -188,7 +290,15 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
   }
 });
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // Delete listing (only by owner)
+=======
+// ✅ Delete listing
+>>>>>>> Stashed changes
+=======
+// ✅ Delete listing
+>>>>>>> Stashed changes
 router.delete('/:id', async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -201,5 +311,6 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 module.exports = router;
