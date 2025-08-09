@@ -78,3 +78,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 .segmented .seg { border: 0; background: transparent; color: var(--muted); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .segmented .seg.active { background: var(--primary); color: var(--primary-ink); }
 .segmented .seg:hover { background: #f3f4f6; }
+
+/* Inline field (checkbox/switch with label) */
+.inline-field { display: inline-flex; align-items: center; gap: 8px; }

@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 
 const listingsRoute = require('./routes/listings');
 
@@ -23,4 +24,16 @@ mongoose.connect(mongoURI)
     app.listen(5000, () => console.log('Server running on port 5000'));
   })
   .catch(err => console.error(err));
+
+// Global error handler to make upload errors readable in the client
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
+  }
+  if (err) {
+    return res.status(500).json({ error: err.message || 'Server error' });
+  }
+  next();
+});
 

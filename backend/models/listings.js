@@ -35,6 +35,7 @@ const ListingSchema = new mongoose.Schema(
   floor: { type: Number, required: true, min: 0 },
   totalFloors: { type: Number, default: 0 },
   furnishing: { type: String, enum: ['Unfurnished', 'Semi-furnished', 'Furnished'], default: 'Unfurnished' },
+  sizeSqft: { type: Number, default: 0 },
 
     // Media (store URLs for now; file uploads can map to URLs later)
     photoUrls: { type: [String], default: [] },
