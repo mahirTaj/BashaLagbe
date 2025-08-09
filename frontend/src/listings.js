@@ -1,107 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from './auth';
 
 export default function Listings() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
-  const [form, setForm] = useState({ title: '', description: '', price: '', location: '' });
-  const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [statusSeg, setStatusSeg] = useState('all'); // all | available | rented
+  const [typeSeg, setTypeSeg] = useState('all'); // all | Apartment | Room | Sublet | Commercial | Hostel
 
   useEffect(() => {
     fetchListings();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
 
   const fetchListings = async () => {
+    setLoading(true);
     try {
-      const res = await axios.get('/api/listings');
+      const res = await axios.get('/api/listings', {
+        headers: { 'x-user-id': user.id },
+      });
       setListings(res.data);
     } catch (err) {
       alert('Error fetching listings');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this listing?')) return;
     try {
-      await axios.delete(`/api/listings/${id}`);
-      fetchListings();
+      await axios.delete(`/api/listings/${id}`, { headers: { 'x-user-id': user.id } });
+      setListings((prev) => prev.filter((l) => l._id !== id));
     } catch (err) {
       alert('Delete failed');
     }
   };
 
-  const handleEditClick = (listing) => {
-    setEditingId(listing._id);
-    setForm({
-      title: listing.title,
-      description: listing.description || '',
-      price: listing.price || '',
-      location: listing.location || '',
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        await axios.put(`/api/listings/${editingId}`, form);
-      } else {
-        await axios.post('/api/listings', form);
-      }
-      setForm({ title: '', description: '', price: '', location: '' });
-      setEditingId(null);
-      fetchListings();
-    } catch (err) {
-      alert('Save failed');
-    }
-  };
+  const filtered = listings.filter((l) => {
+    const statusOk = statusSeg === 'all' || (statusSeg === 'rented' ? !!l.isRented : !l.isRented);
+    const typeOk = typeSeg === 'all' || l.type === typeSeg;
+    return statusOk && typeOk;
+  });
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>{editingId ? 'Edit Listing' : 'Add Listing'}</h2>
-      <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
-        <input
-          type="text"
-          placeholder="Title"
-          value={form.title}
-          onChange={e => setForm({ ...form, title: e.target.value })}
-          required
-          style={{ display: 'block', marginBottom: 10, width: 300 }}
-        />
-        <input
-          type="text"
-          placeholder="Description"
-          value={form.description}
-          onChange={e => setForm({ ...form, description: e.target.value })}
-          style={{ display: 'block', marginBottom: 10, width: 300 }}
-        />
-        <input
-          type="number"
-          placeholder="Price"
-          value={form.price}
-          onChange={e => setForm({ ...form, price: e.target.value })}
-          style={{ display: 'block', marginBottom: 10, width: 300 }}
-        />
-        <input
-          type="text"
-          placeholder="Location"
-          value={form.location}
-          onChange={e => setForm({ ...form, location: e.target.value })}
-          style={{ display: 'block', marginBottom: 10, width: 300 }}
-        />
-        <button type="submit">{editingId ? 'Update' : 'Add'}</button>
-        {editingId && <button type="button" onClick={() => { setEditingId(null); setForm({ title: '', description: '', price: '', location: '' }); }}>Cancel</button>}
-      </form>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>My Listings</h2>
+        <div className="segmented">
+          <button className={`seg ${statusSeg === 'all' ? 'active' : ''}`} onClick={() => setStatusSeg('all')}>All</button>
+          <button className={`seg ${statusSeg === 'available' ? 'active' : ''}`} onClick={() => setStatusSeg('available')}>Available</button>
+          <button className={`seg ${statusSeg === 'rented' ? 'active' : ''}`} onClick={() => setStatusSeg('rented')}>Rented</button>
+        </div>
+        <div className="segmented">
+          <button className={`seg ${typeSeg === 'all' ? 'active' : ''}`} onClick={() => setTypeSeg('all')}>All types</button>
+          <button className={`seg ${typeSeg === 'Apartment' ? 'active' : ''}`} onClick={() => setTypeSeg('Apartment')}>Apartment</button>
+          <button className={`seg ${typeSeg === 'Room' ? 'active' : ''}`} onClick={() => setTypeSeg('Room')}>Room</button>
+          <button className={`seg ${typeSeg === 'Sublet' ? 'active' : ''}`} onClick={() => setTypeSeg('Sublet')}>Sublet</button>
+          <button className={`seg ${typeSeg === 'Commercial' ? 'active' : ''}`} onClick={() => setTypeSeg('Commercial')}>Commercial</button>
+          <button className={`seg ${typeSeg === 'Hostel' ? 'active' : ''}`} onClick={() => setTypeSeg('Hostel')}>Hostel</button>
+        </div>
+        <Link to="/add" style={{ marginLeft: 'auto' }}>
+          <button className="btn">Add Listing</button>
+        </Link>
+      </div>
 
-      <h2>All Listings</h2>
-      <ul>
-        {listings.map(listing => (
-          <li key={listing._id} style={{ marginBottom: 10 }}>
-            <b>{listing.title}</b> - {listing.description} - ${listing.price} - {listing.location}
-            <button style={{ marginLeft: 10 }} onClick={() => handleEditClick(listing)}>Edit</button>
-            <button style={{ marginLeft: 5 }} onClick={() => handleDelete(listing._id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <p>Loading...</p>
+      ) : listings.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center' }}>You have no listings yet.</div>
+    ) : (
+        <div className="cards">
+      {filtered.map((l) => (
+            <div key={l._id} className="card" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+              <div className="thumb" style={{ width: '100%', height: 160 }}>
+                {l.photoUrls?.[0] ? <img src={l.photoUrls[0]} alt="thumb" /> : 'No Photo'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <b style={{ fontSize: 16 }}>{l.title}</b>
+                {l.isRented && <span className="badge" style={{ color: 'var(--success)' }}>Rented</span>}
+              </div>
+              <div style={{ color: '#6b7280', fontSize: 14 }}>
+                {[
+                  l.houseNo,
+                  l.road,
+                  l.area,
+                  l.subdistrict,
+                  l.district,
+                  l.division,
+                ].filter(Boolean).join(', ') || l.location}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontWeight: 700 }}>৳{l.price}</span> • {l.type}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn ghost" onClick={() => navigate(`/edit/${l._id}`)}>Edit</button>
+                  <button className="btn danger" onClick={() => handleDelete(l._id)}>Delete</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
