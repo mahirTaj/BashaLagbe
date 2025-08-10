@@ -1,22 +1,47 @@
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const session = require('express-session');
+const passport = require('./config/passport');  // Import passport config
 
 const listingsRoute = require('./routes/listings');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000', // Your frontend URL
+  credentials: true,
+}));
+
 app.use(express.json());
 
-// Serve uploaded assets
+// Setup session middleware (required for passport sessions)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'secretkey',
+  resave: false,
+  saveUninitialized: false,
+}));
+
+// Initialize passport and session
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+// Use auth routes (including Google OAuth routes inside auth.js)
+app.use('/api/auth', authRoutes);
+
+// Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Listings routes
 app.use('/api/listings', listingsRoute);
 
-const mongoURI = 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const mongoURI = process.env.MONGO_URI;
 
 mongoose.connect(mongoURI)
   .then(() => {
@@ -25,8 +50,7 @@ mongoose.connect(mongoURI)
   })
   .catch(err => console.error(err));
 
-// Global error handler to make upload errors readable in the client
-// eslint-disable-next-line no-unused-vars
+// Global error handler for multer and general errors
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
@@ -37,3 +61,7 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// Test route to check if auth route works
+app.get('/api/auth/test', (req, res) => res.send('Auth route works'));
+
+module.exports = app;

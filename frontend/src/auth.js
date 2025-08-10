@@ -10,10 +10,9 @@ const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
   const [idx, setIdx] = useState(0);
-  const user = USERS[idx];
+  const user = USERS[idx] || { name: 'Guest' };
   const switchUser = () => setIdx((i) => (i === 0 ? 1 : 0));
 
-  // expose user id for API calls
   const value = { user, switchUser };
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
