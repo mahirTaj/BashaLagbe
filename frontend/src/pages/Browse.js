@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
 
 // Public browse/search page (not user restricted)
 export default function Browse() {
@@ -34,12 +35,23 @@ export default function Browse() {
     if (district) p.district = district;
     if (subdistrict) p.subdistrict = subdistrict;
     if (area) p.area = area;
-    if (priceMin) p.priceMin = priceMin;
-    if (priceMax) p.priceMax = priceMax;
-    if (roomsMin) p.roomsMin = roomsMin;
-    if (roomsMax) p.roomsMax = roomsMax;
+    const minNum = priceMin !== '' ? Number(priceMin) : undefined;
+    const maxNum = priceMax !== '' ? Number(priceMax) : undefined;
+    if (Number.isFinite(minNum) && minNum >= 0) p.priceMin = minNum;
+    if (Number.isFinite(maxNum) && maxNum >= 0 && (minNum === undefined || maxNum >= minNum)) p.priceMax = maxNum; // only if valid range
+    const rMinNum = roomsMin !== '' ? Number(roomsMin) : undefined;
+    const rMaxNum = roomsMax !== '' ? Number(roomsMax) : undefined;
+    if (Number.isFinite(rMinNum) && rMinNum >= 0) p.roomsMin = rMinNum;
+    if (Number.isFinite(rMaxNum) && rMaxNum >= 0 && (rMinNum === undefined || rMaxNum >= rMinNum)) p.roomsMax = rMaxNum;
     return p;
   }, [q, type, division, district, subdistrict, area, priceMin, priceMax, roomsMin, roomsMax, page, sort]);
+
+  // Ensure max price never below min price in UI state
+  useEffect(() => {
+    if (priceMin !== '' && priceMax !== '' && Number(priceMax) < Number(priceMin)) {
+      setPriceMax(priceMin); // snap up to min
+    }
+  }, [priceMin]);
 
   useEffect(() => { fetch(); /* eslint-disable-next-line */ }, [params]);
 
@@ -64,6 +76,18 @@ export default function Browse() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  // Derived geographic option lists (cascading)
+  const divisionOptions = useMemo(() => getDivisions(), []);
+  const districtOptions = useMemo(() => division ? getDistricts(division) : [], [division]);
+  const upazilaOptions = useMemo(() => (division && district) ? getUpazilas(division, district) : [], [division, district]);
+
+  // Collect area suggestions from current items (simple unique extraction)
+  const areaOptions = useMemo(() => {
+    const set = new Set();
+    items.forEach(i => { if (i.area) set.add(i.area); });
+    return Array.from(set).slice(0, 30); // limit
+  }, [items]);
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <h2 style={{ margin: 0 }}>Browse Rentals</h2>
@@ -77,14 +101,38 @@ export default function Browse() {
             <option>Commercial</option>
             <option>Hostel</option>
           </select>
-          <input placeholder="Division" value={division} onChange={e => setDivision(e.target.value)} />
-          <input placeholder="District" value={district} onChange={e => setDistrict(e.target.value)} />
-            <input placeholder="Subdistrict" value={subdistrict} onChange={e => setSubdistrict(e.target.value)} />
-          <input placeholder="Area" value={area} onChange={e => setArea(e.target.value)} />
-          <input placeholder="Min price" type="number" value={priceMin} onChange={e => setPriceMin(e.target.value)} />
-          <input placeholder="Max price" type="number" value={priceMax} onChange={e => setPriceMax(e.target.value)} />
-          <input placeholder="Min rooms" type="number" value={roomsMin} onChange={e => setRoomsMin(e.target.value)} />
-          <input placeholder="Max rooms" type="number" value={roomsMax} onChange={e => setRoomsMax(e.target.value)} />
+          <div style={{ position:'relative' }}>
+            <input list="divisionOptions" placeholder="Division" value={division} onChange={e => {
+              const val = e.target.value; setDivision(val); setDistrict(''); setSubdistrict('');
+            }} />
+            <datalist id="divisionOptions">
+              {divisionOptions.map(d => <option key={d} value={d} />)}
+            </datalist>
+          </div>
+          <div style={{ position:'relative' }}>
+            <input list="districtOptions" placeholder="District" value={district} disabled={!division} onChange={e => {
+              const val = e.target.value; setDistrict(val); setSubdistrict('');
+            }} />
+            <datalist id="districtOptions">
+              {districtOptions.map(d => <option key={d} value={d} />)}
+            </datalist>
+          </div>
+          <div style={{ position:'relative' }}>
+            <input list="upazilaOptions" placeholder="Subdistrict / Upazila" value={subdistrict} disabled={!district} onChange={e => setSubdistrict(e.target.value)} />
+            <datalist id="upazilaOptions">
+              {upazilaOptions.map(u => <option key={u} value={u} />)}
+            </datalist>
+          </div>
+          <div style={{ position:'relative' }}>
+            <input list="areaOptions" placeholder="Area" value={area} onChange={e => setArea(e.target.value)} />
+            <datalist id="areaOptions">
+              {areaOptions.map(a => <option key={a} value={a} />)}
+            </datalist>
+          </div>
+          <input placeholder="Min price" type="number" min="0" step="500" value={priceMin} onChange={e => { setPriceMin(e.target.value); setPage(1); }} />
+          <input placeholder="Max price" type="number" step="500" min={priceMin || 0} value={priceMax} onChange={e => { setPriceMax(e.target.value); setPage(1); }} />
+          <input placeholder="Min rooms" type="number" min="0" step="1" value={roomsMin} onChange={e => { setRoomsMin(e.target.value); setPage(1); }} />
+          <input placeholder="Max rooms" type="number" min="0" step="1" value={roomsMax} onChange={e => { setRoomsMax(e.target.value); setPage(1); }} />
           <select value={sort} onChange={e => setSort(e.target.value)}>
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
