@@ -18,6 +18,14 @@ export default function Browse() {
   const [priceMax, setPriceMax] = useState('');
   const [roomsMin, setRoomsMin] = useState('');
   const [roomsMax, setRoomsMax] = useState('');
+  const [bathroomsMin, setBathroomsMin] = useState('');
+  const [bathroomsMax, setBathroomsMax] = useState('');
+  const [personMin, setPersonMin] = useState('');
+  const [personMax, setPersonMax] = useState('');
+  const [balconyMin, setBalconyMin] = useState('');
+  const [balconyMax, setBalconyMax] = useState('');
+  const [serviceChargeMin, setServiceChargeMin] = useState('');
+  const [serviceChargeMax, setServiceChargeMax] = useState('');
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
@@ -46,6 +54,22 @@ export default function Browse() {
     return p;
   }, [q, type, division, district, subdistrict, area, priceMin, priceMax, roomsMin, roomsMax, page, sort]);
 
+  // Extended numeric params
+  const numericExtendedParams = useMemo(() => {
+    const p = {};
+    const addRange = (minVal, maxVal, keyBase) => {
+      const minN = minVal !== '' ? Number(minVal) : undefined;
+      const maxN = maxVal !== '' ? Number(maxVal) : undefined;
+      if (Number.isFinite(minN) && minN >= 0) p[`${keyBase}Min`] = minN;
+      if (Number.isFinite(maxN) && maxN >= 0 && (minN === undefined || maxN >= minN)) p[`${keyBase}Max`] = maxN;
+    };
+    addRange(bathroomsMin, bathroomsMax, 'bathrooms');
+    addRange(personMin, personMax, 'person');
+    addRange(balconyMin, balconyMax, 'balcony');
+    addRange(serviceChargeMin, serviceChargeMax, 'serviceCharge');
+    return p;
+  }, [bathroomsMin, bathroomsMax, personMin, personMax, balconyMin, balconyMax, serviceChargeMin, serviceChargeMax]);
+
   // Ensure max price never below min price in UI state
   useEffect(() => {
     if (priceMin !== '' && priceMax !== '' && Number(priceMax) < Number(priceMin)) {
@@ -53,12 +77,12 @@ export default function Browse() {
     }
   }, [priceMin]);
 
-  useEffect(() => { fetch(); /* eslint-disable-next-line */ }, [params]);
+  useEffect(() => { fetch(); /* eslint-disable-next-line */ }, [params, numericExtendedParams]);
 
   const fetch = async () => {
     setLoading(true); setError('');
     try {
-      const res = await axios.get('/api/listings/search', { params });
+  const res = await axios.get('/api/listings/search', { params: { ...params, ...numericExtendedParams } });
       setItems(res.data.data || []);
       setTotal(res.data.total || 0);
     } catch (e) {
@@ -71,7 +95,10 @@ export default function Browse() {
   const p = new URLSearchParams(location.search); p.delete('q');
   navigate({ pathname: '/browse', search: p.toString() }, { replace: true });
   setType(''); setDivision(''); setDistrict(''); setSubdistrict(''); setArea('');
-    setPriceMin(''); setPriceMax(''); setRoomsMin(''); setRoomsMax(''); setSort('newest'); setPage(1);
+  setPriceMin(''); setPriceMax(''); setRoomsMin(''); setRoomsMax('');
+  setBathroomsMin(''); setBathroomsMax(''); setPersonMin(''); setPersonMax('');
+  setBalconyMin(''); setBalconyMax(''); setServiceChargeMin(''); setServiceChargeMax('');
+  setSort('newest'); setPage(1);
   };
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -133,6 +160,14 @@ export default function Browse() {
           <input placeholder="Max price" type="number" step="500" min={priceMin || 0} value={priceMax} onChange={e => { setPriceMax(e.target.value); setPage(1); }} />
           <input placeholder="Min rooms" type="number" min="0" step="1" value={roomsMin} onChange={e => { setRoomsMin(e.target.value); setPage(1); }} />
           <input placeholder="Max rooms" type="number" min="0" step="1" value={roomsMax} onChange={e => { setRoomsMax(e.target.value); setPage(1); }} />
+          <input placeholder="Min washrooms" type="number" min="0" step="1" value={bathroomsMin} onChange={e => { setBathroomsMin(e.target.value); setPage(1); }} />
+          <input placeholder="Max washrooms" type="number" min="0" step="1" value={bathroomsMax} onChange={e => { setBathroomsMax(e.target.value); setPage(1); }} />
+          <input placeholder="Min persons" type="number" min="0" step="1" value={personMin} onChange={e => { setPersonMin(e.target.value); setPage(1); }} />
+          <input placeholder="Max persons" type="number" min="0" step="1" value={personMax} onChange={e => { setPersonMax(e.target.value); setPage(1); }} />
+          <input placeholder="Min corridor/balcony" type="number" min="0" step="1" value={balconyMin} onChange={e => { setBalconyMin(e.target.value); setPage(1); }} />
+          <input placeholder="Max corridor/balcony" type="number" min="0" step="1" value={balconyMax} onChange={e => { setBalconyMax(e.target.value); setPage(1); }} />
+          <input placeholder="Min service charge" type="number" min="0" step="500" value={serviceChargeMin} onChange={e => { setServiceChargeMin(e.target.value); setPage(1); }} />
+          <input placeholder="Max service charge" type="number" min="0" step="500" value={serviceChargeMax} onChange={e => { setServiceChargeMax(e.target.value); setPage(1); }} />
           <select value={sort} onChange={e => setSort(e.target.value)}>
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>

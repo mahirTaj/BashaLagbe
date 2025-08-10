@@ -124,6 +124,14 @@ router.get('/search', async (req, res) => {
       priceMax,
       roomsMin,
       roomsMax,
+  bathroomsMin,
+  bathroomsMax,
+  personMin,
+  personMax,
+  balconyMin,
+  balconyMax,
+  serviceChargeMin,
+  serviceChargeMax,
       page = '1',
       limit = '20',
       sort = 'newest',
@@ -170,6 +178,34 @@ router.get('/search', async (req, res) => {
       filter.rooms = {};
       if (roomsMin) filter.rooms.$gte = Number(roomsMin);
       if (roomsMax) filter.rooms.$lte = Number(roomsMax);
+    }
+
+    // Bathrooms (washrooms) range
+    if (bathroomsMin || bathroomsMax) {
+      filter.bathrooms = {};
+      if (bathroomsMin) filter.bathrooms.$gte = Number(bathroomsMin);
+      if (bathroomsMax) filter.bathrooms.$lte = Number(bathroomsMax);
+    }
+
+    // Person capacity range
+    if (personMin || personMax) {
+      filter.personCount = {};
+      if (personMin) filter.personCount.$gte = Number(personMin);
+      if (personMax) filter.personCount.$lte = Number(personMax);
+    }
+
+    // Balcony (corridor?) range
+    if (balconyMin || balconyMax) {
+      filter.balcony = {};
+      if (balconyMin) filter.balcony.$gte = Number(balconyMin);
+      if (balconyMax) filter.balcony.$lte = Number(balconyMax);
+    }
+
+    // Service charge range
+    if (serviceChargeMin || serviceChargeMax) {
+      filter.serviceCharge = {};
+      if (serviceChargeMin) filter.serviceCharge.$gte = Number(serviceChargeMin);
+      if (serviceChargeMax) filter.serviceCharge.$lte = Number(serviceChargeMax);
     }
 
     if (typeof isRented !== 'undefined') {
