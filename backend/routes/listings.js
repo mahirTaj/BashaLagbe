@@ -3,6 +3,7 @@ const router = express.Router();
 const Listing = require('../models/listings');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // --------------------------------------------------
 // Helpers & upload config
@@ -20,9 +21,38 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
+<<<<<<< HEAD
 // --------------------------------------------------
 // Create listing (owner required)
 // --------------------------------------------------
+=======
+// Helpers to map a stored URL to a local uploads file path and delete safely
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+function urlToUploadPath(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url, 'http://localhost'); // base for relative urls
+    const idx = u.pathname.indexOf('/uploads/');
+    if (idx === -1) return null;
+    const rel = decodeURIComponent(u.pathname.substring(idx + '/uploads/'.length));
+    if (!rel || rel.includes('..') || path.isAbsolute(rel)) return null;
+    return path.join(uploadsDir, rel);
+  } catch {
+    return null;
+  }
+}
+
+async function unlinkSafe(filePath) {
+  if (!filePath) return;
+  try {
+    await fs.promises.unlink(filePath);
+  } catch (e) {
+    // ignore if already missing or access issues
+  }
+}
+
+// Create listing (requires userId)
+>>>>>>> main
 router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -270,6 +300,10 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
     const newPhotoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
     const keep = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : doc.photoUrls;
 
+  // Track originals to know what to delete later
+  const originalPhotoUrls = Array.isArray(doc.photoUrls) ? [...doc.photoUrls] : [];
+  const originalVideoUrl = doc.videoUrl || '';
+
     doc.title = req.body.title ?? doc.title;
     doc.description = req.body.description ?? doc.description;
     doc.type = req.body.type ?? doc.type;
@@ -304,10 +338,18 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
   if (typeof req.body.sizeSqft !== 'undefined') doc.sizeSqft = Number(req.body.sizeSqft) || 0;
 
     doc.photoUrls = [...keep, ...newPhotoUrls];
+    let removedVideoUrl = '';
     if (req.files?.video?.[0]) {
+      // Replace with newly uploaded video
+      removedVideoUrl = originalVideoUrl;
       doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
     } else if (req.body.removeVideo === 'true') {
+      // Explicitly remove existing video
+      removedVideoUrl = originalVideoUrl;
       doc.videoUrl = '';
+    } else if (req.body.existingVideoUrl) {
+      // Keep existing video when the client confirms it should remain
+      doc.videoUrl = req.body.existingVideoUrl;
     }
 
     // Validate required fields after applying changes
@@ -333,6 +375,16 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
     if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
 
     const updated = await doc.save();
+
+    // After successful save, delete any removed photos/videos from disk (best effort)
+    const removedPhotos = originalPhotoUrls.filter((u) => !doc.photoUrls.includes(u));
+    const pathsToDelete = [
+      ...removedPhotos.map(urlToUploadPath),
+      urlToUploadPath(removedVideoUrl),
+    ].filter(Boolean);
+    // Fire and forget
+    Promise.all(pathsToDelete.map(unlinkSafe)).catch(() => {});
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -347,9 +399,15 @@ router.delete('/:id', async (req, res) => {
     const userId = getUserId(req);
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
-    const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
-    if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });
-    res.json({ message: 'Listing deleted' });
+  const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
+  if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });
+
+  // Best-effort cleanup of files referenced by the deleted listing
+  const fileUrls = [...(deleted.photoUrls || []), deleted.videoUrl || ''].filter(Boolean);
+  const filePaths = fileUrls.map(urlToUploadPath).filter(Boolean);
+  Promise.all(filePaths.map(unlinkSafe)).catch(() => {});
+
+  res.json({ message: 'Listing deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

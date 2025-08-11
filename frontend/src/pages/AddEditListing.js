@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../auth';
 import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
+import { Box, Paper, Grid, TextField, Select, MenuItem, FormControl, InputLabel, Button, Typography, Checkbox, FormControlLabel, Chip, Stack, Tabs, Tab } from '@mui/material';
 
 const empty = {
   title: '',
@@ -29,9 +30,17 @@ export default function AddEditListing() {
   const [newPhotos, setNewPhotos] = useState([]); // File[]
   const [videoUrl, setVideoUrl] = useState(''); // existing video url
   const [newVideo, setNewVideo] = useState(null); // File | null
+  const newVideoPreview = useMemo(() => (newVideo ? URL.createObjectURL(newVideo) : ''), [newVideo]);
+  useEffect(() => {
+    return () => {
+      // revoke object URL when file changes/unmounts
+      if (newVideoPreview) URL.revokeObjectURL(newVideoPreview);
+    };
+  }, [newVideoPreview]);
   const [dragActive, setDragActive] = useState(false);
   const [removeVideo, setRemoveVideo] = useState(false);
   const maxPhotos = 12;
+  const [tab, setTab] = useState(0);
 
   const keepCount = useMemo(
     () => existingPhotos.filter((u) => keepPhoto[u]).length,
@@ -45,12 +54,23 @@ export default function AddEditListing() {
       try {
         const res = await axios.get(`/api/listings/${id}`, { headers: { 'x-user-id': user.id } });
         const data = res.data;
+        // Robustly format date to YYYY-MM-DD for the date input
+        const toYMD = (val) => {
+          if (!val) return '';
+          try {
+            const d = new Date(val);
+            if (Number.isNaN(d.getTime())) return '';
+            return d.toISOString().slice(0, 10);
+          } catch {
+            return '';
+          }
+        };
         setForm({
           title: data.title || '',
           description: data.description || '',
           type: data.type || 'Apartment',
           price: data.price ?? '',
-          availableFrom: data.availableFrom ? data.availableFrom.substring(0, 10) : '',
+          availableFrom: toYMD(data.availableFrom),
           rooms: data.rooms ?? '',
           bathrooms: data.bathrooms ?? '',
           balcony: data.balcony ?? '',
@@ -140,8 +160,20 @@ export default function AddEditListing() {
 
   const onPickVideo = (e) => {
     const file = e.target.files?.[0];
-  setNewVideo(file || null);
-  if (file) setRemoveVideo(false); // replacing existing video
+    if (!file) { setNewVideo(null); return; }
+    if (!file.type?.startsWith('video/')) {
+      alert('Please select a valid video file.');
+      e.target.value = '';
+      return;
+    }
+    const VIDEO_MAX = 50 * 1024 * 1024; // 50 MB
+    if (file.size > VIDEO_MAX) {
+      alert('Video is larger than 50 MB. Please choose a smaller file.');
+      e.target.value = '';
+      return;
+    }
+    setNewVideo(file);
+    setRemoveVideo(false); // replacing existing video
   };
 
   const onSubmit = async (e) => {
@@ -214,10 +246,17 @@ export default function AddEditListing() {
       // Optional new video (replace old)
   if (newVideo) {
         const VIDEO_MAX = 50 * 1024 * 1024;
-        if (newVideo.size <= VIDEO_MAX) fd.append('video', newVideo);
+        if (newVideo.size > VIDEO_MAX) {
+          throw new Error('Selected video exceeds 50 MB.');
+        }
+        fd.append('video', newVideo);
       }
   // Remove existing video if requested
   fd.append('removeVideo', String(!!removeVideo));
+  // If editing and keeping the existing video (not replacing or removing), send it explicitly
+  if (id && videoUrl && !removeVideo && !newVideo) {
+    fd.append('existingVideoUrl', videoUrl);
+  }
 
       const headers = { 'x-user-id': user.id };
       if (id) await axios.put(`/api/listings/${id}`, fd, { headers });
@@ -242,251 +281,275 @@ export default function AddEditListing() {
 
   const isEdit = Boolean(id);
   return (
-    <div className="card" style={{ maxWidth: 960, margin: '20px auto' }}>
-      <h2 style={{ marginTop: 0 }}>{isEdit ? 'Edit Listing' : 'Add Listing'}</h2>
-      <form onSubmit={onSubmit} className="grid cols-2" style={{ gap: 16 }}>
-        <label>
-          Title<span className="req-star">*</span>
-          <input name="title" value={form.title} onChange={onChange} required />
-        </label>
-        <label>
-          Description
-          <textarea name="description" value={form.description} onChange={onChange} rows={4} />
-        </label>
-        <label>
-          Listing Type<span className="req-star">*</span>
-          <select name="type" value={form.type} onChange={onChange} required>
-            <option>Apartment</option>
-            <option>Room</option>
-            <option>Sublet</option>
-            <option>Commercial</option>
-            <option>Hostel</option>
-          </select>
-        </label>
-        <label>
-          Rent Price<span className="req-star">*</span>
-          <input type="number" name="price" min="0" step="1" value={form.price} onChange={onChange} required />
-        </label>
-        <label>
-          Available From<span className="req-star">*</span>
-          <input type="date" name="availableFrom" value={form.availableFrom} onChange={onChange} required />
-        </label>
-        <label>
-          Rooms<span className="req-star">*</span>
-          <input type="number" name="rooms" min="0" step="1" value={form.rooms} onChange={onChange} required />
-        </label>
-        <label>
-          Bathrooms
-          <input type="number" name="bathrooms" value={form.bathrooms} onChange={onChange} />
-        </label>
-        <label>
-          Balcony
-          <input type="number" name="balcony" value={form.balcony} onChange={onChange} />
-        </label>
-        <label>
-          Person Count
-          <input type="number" name="personCount" value={form.personCount} onChange={onChange} />
-        </label>
-        <label>
-          Features (comma separated)
-          <input name="features" value={form.features} onChange={onChange} />
-        </label>
-
-        {/* Address (structured) */}
-        <div style={{ gridColumn: '1 / -1' }}>
-      <b>Address</b>
-          <div className="grid cols-2" style={{ marginTop: 8 }}>
-            <label>
-        Division<span className="req-star">*</span>
-        <select name="division" value={form.division || ''} onChange={onChange} required>
-                <option value="">Select division</option>
-                {getDivisions().map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-        District<span className="req-star">*</span>
-        <select name="district" value={form.district || ''} onChange={onChange} disabled={!form.division} required>
-                <option value="">Select district</option>
-                {getDistricts(form.division).map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-        Subdistrict<span className="req-star">*</span>
-        <select name="subdistrict" value={form.subdistrict || ''} onChange={onChange} disabled={!form.district} required>
-                <option value="">Select subdistrict</option>
-                {getUpazilas(form.division, form.district).map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-        Area<span className="req-star">*</span>
-        <input name="area" value={form.area || ''} onChange={onChange} required />
-            </label>
-            <label>
-              Road
-              <input name="road" value={form.road || ''} onChange={onChange} />
-            </label>
-            <label>
-              House No
-              <input name="houseNo" value={form.houseNo || ''} onChange={onChange} />
-            </label>
-          </div>
-        </div>
-
-        {/* Media section */}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <b>Photos<span className="req-star">*</span></b>
-              <span className="badge">{maxPhotos - remainingSlots}/{maxPhotos}</span>
-            </div>
-            <label
-              className={`dropzone ${dragActive ? 'active' : ''}`}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop}
-            >
-              <input type="file" accept="image/*" multiple onChange={onPickPhotos} hidden />
-              {remainingSlots > 0 ? `Click or drop images (up to ${remainingSlots} more)` : 'Photo limit reached'}
-            </label>
-          </div>
-
-          {/* Existing photos with keep toggles */}
-          {existingPhotos.length > 0 && (
-            <div className="thumb-grid">
-              {existingPhotos.map((u) => (
-                <label key={u} className="thumb-card">
-                  <img src={u} alt="" style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
-                  <div style={{ padding: 6, fontSize: 12, background: '#fff' }}>
-                    <input type="checkbox" checked={!!keepPhoto[u]} onChange={(e) => setKeepPhoto((m) => ({ ...m, [u]: e.target.checked }))} /> keep
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
-
-          {/* New photo previews */}
-          {photoPreviews.length > 0 && (
-            <div className="thumb-grid">
-              {photoPreviews.map((u, i) => (
-                <div key={i} className="thumb-card">
-                  <img src={u} alt="" style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
-                  <button type="button" className="thumb-remove" title="Remove" onClick={() => removeNewPhoto(i)}>×</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Video */}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <b>Video</b>
-            <label className="dropzone">
-              <input type="file" accept="video/*" onChange={onPickVideo} hidden />
-              Click to select a video (optional)
-            </label>
-          </div>
-          {newVideo ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <p style={{ fontSize: 12, color: '#666', margin: 0 }}>{newVideo.name}</p>
-              <button type="button" className="btn ghost" onClick={() => setNewVideo(null)}>Remove</button>
-            </div>
-          ) : videoUrl && !removeVideo ? (
-            <div>
-              <video src={videoUrl} controls style={{ width: '100%', maxHeight: 240 }} />
-              <div style={{ marginTop: 6 }}>
-                <button type="button" className="btn danger" onClick={() => setRemoveVideo(true)}>Remove video</button>
-              </div>
-            </div>
-          ) : removeVideo ? (
-            <div className="badge" style={{ width: 'fit-content' }}>
-              Video will be removed on save
-              <button type="button" className="icon-btn" style={{ marginLeft: 8 }} onClick={() => setRemoveVideo(false)}>Undo</button>
-            </div>
-          ) : null}
-        </div>
-        {isEdit && (
-          <label className="inline-field">
-            <input type="checkbox" name="isRented" checked={form.isRented} onChange={onChange} />
-            <span>Mark as rented</span>
-          </label>
+  <Paper sx={{ maxWidth: 1400, mx: 'auto', my: 1.5, p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 1.5 }}>{isEdit ? 'Edit Listing' : 'Add Listing'}</Typography>
+      <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2 }}>
+        <Tab label="Basic" />
+        <Tab label="Address" />
+        <Tab label="Media" />
+        <Tab label="Pricing" />
+        <Tab label="Details" />
+        <Tab label="Contact" />
+      </Tabs>
+      <Box component="form" onSubmit={onSubmit}>
+        {tab === 0 && (
+          <>
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={6}>
+            <TextField label={<>Title<span className="req-star">*</span></>} name="title" value={form.title} onChange={onChange} fullWidth required />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+            <FormControl fullWidth required>
+              <InputLabel>Listing Type</InputLabel>
+              <Select label="Listing Type" name="type" value={form.type} onChange={onChange}>
+                <MenuItem value="Apartment">Apartment</MenuItem>
+                <MenuItem value="Room">Room</MenuItem>
+                <MenuItem value="Sublet">Sublet</MenuItem>
+                <MenuItem value="Commercial">Commercial</MenuItem>
+                <MenuItem value="Hostel">Hostel</MenuItem>
+              </Select>
+            </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+            <TextField type="date" label={<>Available From<span className="req-star">*</span></>} name="availableFrom" value={form.availableFrom} onChange={onChange} fullWidth required InputLabelProps={{ shrink: true }} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+            <TextField type="number" label={<>Rooms<span className="req-star">*</span></>} name="rooms" inputProps={{ min: 0, step: 1 }} value={form.rooms} onChange={onChange} fullWidth required />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+            <TextField type="number" label="Bathrooms" name="bathrooms" value={form.bathrooms} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+            <TextField type="number" label="Balcony" name="balcony" value={form.balcony} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+            <TextField type="number" label="Person Count" name="personCount" value={form.personCount} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField label="Features (comma separated)" name="features" value={form.features} onChange={onChange} fullWidth />
+            </Grid>
+          </Grid>
+          <Box sx={{ mt: 1.5 }}>
+            <TextField label="Description" name="description" value={form.description} onChange={onChange} fullWidth multiline minRows={10} placeholder="Add more details about the property..." />
+          </Box>
+          </>
         )}
 
-        {/* Pricing & terms (optional) */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <b>Pricing & Terms</b>
-          <div className="grid cols-2" style={{ marginTop: 8 }}>
-            <label>
-              Security deposit
-              <input type="number" name="deposit" min="0" step="1" value={form.deposit || ''} onChange={onChange} />
-            </label>
-            <label>
-              Service charge
-              <input type="number" name="serviceCharge" min="0" step="1" value={form.serviceCharge || ''} onChange={onChange} />
-            </label>
-            <label className="inline-field" style={{ gap: 6 }}>
-              <input type="checkbox" name="negotiable" checked={!!form.negotiable} onChange={onChange} />
-              <span>Negotiable</span>
-            </label>
-          </div>
-        </div>
+        {tab === 1 && (
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel shrink>Division</InputLabel>
+                <Select
+                  label="Division"
+                  name="division"
+                  value={form.division || ''}
+                  onChange={onChange}
+                  size="medium"
+                  displayEmpty
+                  renderValue={(val) => val ? val : <Typography color="text.disabled">Select division</Typography>}
+                >
+                  <MenuItem value=""><em>Select division</em></MenuItem>
+                  {getDivisions().map((d) => (
+                    <MenuItem key={d} value={d}>{d}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required disabled={!form.division}>
+                <InputLabel shrink>District</InputLabel>
+                <Select
+                  label="District"
+                  name="district"
+                  value={form.district || ''}
+                  onChange={onChange}
+                  size="medium"
+                  displayEmpty
+                  renderValue={(val) => val ? val : <Typography color="text.disabled">Select district</Typography>}
+                >
+                  <MenuItem value=""><em>Select district</em></MenuItem>
+                  {getDistricts(form.division).map((d) => (
+                    <MenuItem key={d} value={d}>{d}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required disabled={!form.district}>
+                <InputLabel shrink>Subdistrict</InputLabel>
+                <Select
+                  label="Subdistrict"
+                  name="subdistrict"
+                  value={form.subdistrict || ''}
+                  onChange={onChange}
+                  size="medium"
+                  displayEmpty
+                  renderValue={(val) => val ? val : <Typography color="text.disabled">Select subdistrict</Typography>}
+                >
+                  <MenuItem value=""><em>Select subdistrict</em></MenuItem>
+                  {getUpazilas(form.division, form.district).map((u) => (
+                    <MenuItem key={u} value={u}>{u}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField label={<>Area<span className="req-star">*</span></>} name="area" value={form.area || ''} onChange={onChange} fullWidth required />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField label="Road" name="road" value={form.road || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField label="House No" name="houseNo" value={form.houseNo || ''} onChange={onChange} fullWidth />
+            </Grid>
+          </Grid>
+        )}
 
-        {/* Extra details (optional) */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <b>Extra details</b>
-          <div className="grid cols-2" style={{ marginTop: 8 }}>
-            <label>
-              Floor<span className="req-star">*</span>
-              <input type="number" name="floor" min="0" step="1" value={form.floor || ''} onChange={onChange} required />
-            </label>
-            <label>
-              Total floors
-              <input type="number" name="totalFloors" min="0" step="1" value={form.totalFloors || ''} onChange={onChange} />
-            </label>
-            <label>
-              Size (sq ft)
-              <input type="number" name="sizeSqft" min="0" step="1" value={form.sizeSqft || ''} onChange={onChange} />
-            </label>
-            <label>
-              Furnishing
-              <select name="furnishing" value={form.furnishing || 'Unfurnished'} onChange={onChange}>
-                <option>Unfurnished</option>
-                <option>Semi-furnished</option>
-                <option>Furnished</option>
-              </select>
-            </label>
-            <label>
-              Utilities included (comma separated)
-              <input name="utilitiesIncluded" value={form.utilitiesIncluded || ''} onChange={onChange} placeholder="e.g., water, gas, internet" />
-            </label>
-          </div>
-        </div>
+        {tab === 2 && (
+          <Grid container spacing={1.5}>
+            <Grid item xs={12}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <b>Photos<span className="req-star">*</span></b>
+                  <span className="badge">{maxPhotos - remainingSlots}/{maxPhotos}</span>
+                </div>
+                <label
+                  className={`dropzone ${dragActive ? 'active' : ''}`}
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onDrop={onDrop}
+                >
+                  <input type="file" accept="image/*" multiple onChange={onPickPhotos} hidden />
+                  {remainingSlots > 0 ? `Click or drop images (up to ${remainingSlots} more)` : 'Photo limit reached'}
+                </label>
+              </div>
 
-        {/* Contact (optional) */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <b>Contact</b>
-          <div className="grid cols-2" style={{ marginTop: 8 }}>
-            <label>
-              Contact name
-              <input name="contactName" value={form.contactName || ''} onChange={onChange} />
-            </label>
-            <label>
-              Phone<span className="req-star">*</span>
-              <input name="phone" value={form.phone || ''} onChange={onChange} placeholder="01XXXXXXXXX" required />
-            </label>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button className="btn" type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
-          <button className="btn ghost" type="button" onClick={() => navigate('/')}>Cancel</button>
-        </div>
-      </form>
-    </div>
+              {existingPhotos.length > 0 && (
+                <div className="thumb-grid">
+                  {existingPhotos.map((u) => (
+                    <label key={u} className="thumb-card">
+                      <img src={u} alt="" style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
+                      <div style={{ padding: 6, fontSize: 12, background: '#fff' }}>
+                        <input type="checkbox" checked={!!keepPhoto[u]} onChange={(e) => setKeepPhoto((m) => ({ ...m, [u]: e.target.checked }))} /> keep
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {photoPreviews.length > 0 && (
+                <div className="thumb-grid">
+                  {photoPreviews.map((u, i) => (
+                    <div key={i} className="thumb-card">
+                      <img src={u} alt="" style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
+                      <button type="button" className="thumb-remove" title="Remove" onClick={() => removeNewPhoto(i)}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Grid>
+
+            <Grid item xs={12}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <b>Video</b>
+                <label className="dropzone">
+                  <input type="file" accept="video/*" onChange={onPickVideo} hidden />
+                  Click to select a video (optional, max 50 MB)
+                </label>
+              </div>
+              {newVideo ? (
+                <div>
+                  <video src={newVideoPreview} controls style={{ width: '100%', maxHeight: 240 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                    <p style={{ fontSize: 12, color: '#666', margin: 0 }}>{newVideo.name}</p>
+                    <button type="button" className="btn ghost" onClick={() => setNewVideo(null)}>Remove</button>
+                  </div>
+                </div>
+              ) : videoUrl && !removeVideo ? (
+                <div>
+                  <video src={videoUrl} controls style={{ width: '100%', maxHeight: 240 }} />
+                  <div style={{ marginTop: 6 }}>
+                    <button type="button" className="btn danger" onClick={() => setRemoveVideo(true)}>Remove video</button>
+                  </div>
+                </div>
+              ) : removeVideo ? (
+                <div className="badge" style={{ width: 'fit-content' }}>
+                  Video will be removed on save
+                  <button type="button" className="icon-btn" style={{ marginLeft: 8 }} onClick={() => setRemoveVideo(false)}>Undo</button>
+                </div>
+              ) : null}
+            </Grid>
+            {isEdit && (
+              <Grid item xs={12}>
+                <FormControlLabel control={<Checkbox name="isRented" checked={form.isRented} onChange={onChange} />} label="Mark as rented" />
+              </Grid>
+            )}
+          </Grid>
+        )}
+
+        {tab === 3 && (
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label={<>Rent Price<span className="req-star">*</span></>} name="price" inputProps={{ min: 0, step: 1 }} value={form.price} onChange={onChange} fullWidth required />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Security deposit" name="deposit" inputProps={{ min: 0, step: 1 }} value={form.deposit || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Service charge" name="serviceCharge" inputProps={{ min: 0, step: 1 }} value={form.serviceCharge || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel control={<Checkbox name="negotiable" checked={!!form.negotiable} onChange={onChange} />} label="Negotiable" />
+            </Grid>
+          </Grid>
+        )}
+
+        {tab === 4 && (
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label={<>Floor<span className="req-star">*</span></>} name="floor" inputProps={{ min: 0, step: 1 }} value={form.floor || ''} onChange={onChange} required fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Total floors" name="totalFloors" inputProps={{ min: 0, step: 1 }} value={form.totalFloors || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Size (sq ft)" name="sizeSqft" inputProps={{ min: 0, step: 1 }} value={form.sizeSqft || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Furnishing</InputLabel>
+                <Select label="Furnishing" name="furnishing" value={form.furnishing || 'Unfurnished'} onChange={onChange}>
+                  <MenuItem value="Unfurnished">Unfurnished</MenuItem>
+                  <MenuItem value="Semi-furnished">Semi-furnished</MenuItem>
+                  <MenuItem value="Furnished">Furnished</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField label="Utilities included (comma separated)" name="utilitiesIncluded" value={form.utilitiesIncluded || ''} onChange={onChange} placeholder="e.g., water, gas, internet" fullWidth />
+            </Grid>
+          </Grid>
+        )}
+
+        {tab === 5 && (
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={6}>
+              <TextField label="Contact name" name="contactName" value={form.contactName || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField label={<>Phone<span className="req-star">*</span></>} name="phone" value={form.phone || ''} onChange={onChange} placeholder="01XXXXXXXXX" required fullWidth />
+            </Grid>
+          </Grid>
+        )}
+
+        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+          <Button variant="contained" type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
+          <Button variant="outlined" type="button" onClick={() => navigate('/')}>Cancel</Button>
+        </Stack>
+      </Box>
+    </Paper>
   );
 }
