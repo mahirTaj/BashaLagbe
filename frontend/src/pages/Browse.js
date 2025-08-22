@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
 
 // Public browse/search page (not user restricted)
@@ -185,18 +185,22 @@ export default function Browse() {
       {loading ? <p>Loading...</p> : error ? <p style={{ color: 'red' }}>{error}</p> : items.length === 0 ? <div className="card">No results.</div> : (
         <div className="cards">
           {items.map(l => (
-            <div key={l._id} className="card" style={{ display:'grid', gap: 8 }}>
-              <div style={{ width: '100%', height: 140, background:'#f3f4f6', position:'relative' }}>
-                {l.photoUrls?.[0] && <img src={l.photoUrls[0]} alt="thumb" style={{ width:'100%', height:'100%', objectFit:'cover' }} />}
+            <Link key={l._id} to={`/listing/${l._id}`} className="card" style={{ display:'grid', gap: 8, textDecoration:'none', color:'inherit', minHeight: 260 }}>
+              <div style={{ width: '100%', height: 160, background:'#f3f4f6', position:'relative', borderRadius:4, overflow:'hidden' }}>
+                {l.photoUrls?.[0] ? (
+                  <img src={l.photoUrls[0]} alt="thumb" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                ) : (
+                  <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#777' }}>No Photo</div>
+                )}
                 {l.isRented && <span className="badge" style={{ position:'absolute', top:6, left:6, background:'#fff', color:'var(--success)' }}>Rented</span>}
               </div>
-              <b>{l.title}</b>
-              <div style={{ fontSize:12, color:'#666' }}>{[l.area,l.subdistrict,l.district,l.division].filter(Boolean).join(', ')}</div>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <b style={{ lineHeight:1.2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{l.title}</b>
+              <div style={{ fontSize:12, color:'#666', display:'-webkit-box', WebkitLineClamp:1, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{[l.area,l.subdistrict,l.district,l.division].filter(Boolean).join(', ')}</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'auto' }}>
                 <span style={{ fontWeight:600 }}>৳{l.price}</span>
                 <span style={{ fontSize:12 }}>{l.type}</span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useLocation 
 import Listings from './listings';
 import AddEditListing from './pages/AddEditListing';
 import Browse from './pages/Browse';
+import ListingDetails from './pages/ListingDetails';
 import { AuthProvider, useAuth } from './auth';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -67,6 +68,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Listings />} />
   <Route path="/browse" element={<Browse />} />
+  <Route path="/listing/:id" element={<ListingDetails />} />
   <Route path="/add" element={<AddEditListing />} />
       <Route path="/edit/:id" element={<AddEditListing />} />
       <Route path="*" element={<Navigate to="/" />} />
@@ -80,16 +82,29 @@ export default function App() {
       mode: 'light',
       primary: { main: '#7c3aed' },
     },
-    shape: { borderRadius: 8 },
-    typography: { fontSize: 13 },
+    shape: { borderRadius: 12 },
+    typography: {
+      htmlFontSize: 16,
+      fontSize: 16,
+      h5: { fontWeight: 700 },
+      h6: { fontWeight: 700 },
+      subtitle1: { fontSize: '1.05rem', fontWeight: 600 },
+      body1: { fontSize: '1rem' },
+      body2: { fontSize: '0.95rem' },
+    },
     components: {
-      MuiTextField: { defaultProps: { size: 'small', margin: 'dense' } },
-      MuiFormControl: { defaultProps: { size: 'small', margin: 'dense' } },
-      MuiSelect: { defaultProps: { size: 'small' } },
-      MuiButton: { defaultProps: { size: 'small' } },
-      MuiToggleButton: { defaultProps: { size: 'small' } },
-      MuiCheckbox: { defaultProps: { size: 'small' } },
-      MuiIconButton: { defaultProps: { size: 'small' } },
+      MuiTextField: { defaultProps: { size: 'medium', margin: 'dense' } },
+      MuiFormControl: { defaultProps: { size: 'medium', margin: 'dense' } },
+      MuiSelect: { defaultProps: { size: 'medium' } },
+      MuiButton: { defaultProps: { size: 'medium' } },
+      MuiToggleButton: { defaultProps: { size: 'medium' } },
+      MuiCheckbox: { defaultProps: { size: 'medium' } },
+      MuiIconButton: { defaultProps: { size: 'medium' } },
+      MuiButtonBase: { styleOverrides: { root: { fontWeight: 600 } } },
+      MuiButton: { styleOverrides: { root: { paddingInline: 20, minHeight: 44 } } },
+      MuiChip: { styleOverrides: { root: { fontSize: '0.75rem', height: 28 } } },
+      MuiCard: { styleOverrides: { root: { borderRadius: 16 } } },
+      MuiCardContent: { styleOverrides: { root: { padding: 16, '&:last-child': { paddingBottom: 16 } } } },
       MuiCardContent: { styleOverrides: { root: { padding: 12, '&:last-child': { paddingBottom: 12 } } } },
       MuiCardActions: { styleOverrides: { root: { padding: '8px 12px' } } },
       MuiToolbar: { defaultProps: { variant: 'dense' } },
@@ -101,7 +116,7 @@ export default function App() {
         <CssBaseline />
         <BrowserRouter>
           <Nav />
-          <Box sx={{ maxWidth: 1400, mx: 'auto', p: 2 }}>
+          <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
             <AppRoutes />
           </Box>
         </BrowserRouter>
