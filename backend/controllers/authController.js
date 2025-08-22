@@ -25,7 +25,7 @@ exports.register = async (req, res) => {
     await user.save();
 
     // Return jsonwebtoken
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' }); // 7 days
 
     res.status(201).json({ token });
   } catch (err) {
@@ -56,7 +56,7 @@ exports.login = async (req, res) => {
     }
 
     // Return jsonwebtoken
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' }); // 7 days
 
     res.json({
       token,
