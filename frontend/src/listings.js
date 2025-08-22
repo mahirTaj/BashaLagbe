@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth';
 import { Box, Button, Chip, CircularProgress, Grid, Stack, ToggleButton, ToggleButtonGroup, Typography, Card, CardContent, CardMedia, CardActions, Paper, TextField, InputAdornment, IconButton } from '@mui/material';
+import { Button as UiButton } from './components/ui/button';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
@@ -59,7 +60,9 @@ export default function Listings() {
     <Box sx={{ mt: 3 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>My Listings</Typography>
-        <Button component={Link} to="/add" variant="contained">Add Listing</Button>
+        <UiButton asChild>
+          <Link to="/add">Add Listing</Link>
+        </UiButton>
       </Stack>
 
       <Paper
@@ -141,29 +144,43 @@ export default function Listings() {
           <Typography>You have no listings yet.</Typography>
         </Card>
       ) : (
-  <Grid container spacing={1.5}>
+  <Grid container spacing={2.5}>
           {filtered.map((l) => (
             <Grid item xs={12} sm={6} md={4} key={l._id}>
-              <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                {l.photoUrls?.[0] ? (
-                  <CardMedia component="img" height="140" image={l.photoUrls[0]} alt="thumb" />
-                ) : (
-                  <Box sx={{ height: 140, display: 'grid', placeItems: 'center', bgcolor: 'grey.100', color: 'text.secondary' }}>No Photo</Box>
-                )}
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{l.title}</Typography>
-                    {l.isRented && <Chip size="small" color="success" label="Rented" />}
+              <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 380 }}>
+                <Box sx={{ height: 200, position: 'relative', bgcolor: 'grey.100', overflow: 'hidden' }}>
+                  {l.photoUrls?.[0] ? (
+                    <img
+                      src={l.photoUrls[0]}
+                      alt="thumb"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'text.secondary' }}>No Photo</Box>
+                  )}
+                  {l.isRented && <Chip size="small" color="success" label="Rented" sx={{ position: 'absolute', top: 8, left: 8 }} />}
+                </Box>
+                <CardContent sx={{ flexGrow: 1, display: 'grid', alignContent: 'start', gap: 0.5 }}>
+                  <Stack direction="row" spacing={1} alignItems="flex-start">
+                    <Button
+                      onClick={() => navigate(`/listing/${l._id}`)}
+                      variant="text"
+                      size="small"
+                      sx={{ fontWeight: 700, textTransform: 'none', px: 0, minWidth: 0, lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}
+                    >
+                      {l.title}
+                    </Button>
                   </Stack>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {[l.houseNo, l.road, l.area, l.subdistrict, l.district, l.division].filter(Boolean).join(', ') || l.location}
                   </Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 0.5 }}>৳{l.price}</Typography>
                 </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between' }}>
-                  <Typography sx={{ fontWeight: 700 }}>৳{l.price} • {l.type}</Typography>
+                <CardActions sx={{ justifyContent: 'space-between', pt: 0 }}>
+                  <Chip label={l.type} size="small" color="primary" />
                   <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" onClick={() => navigate(`/edit/${l._id}`)}>Edit</Button>
-                    <Button color="error" variant="contained" onClick={() => handleDelete(l._id)}>Delete</Button>
+                    <UiButton variant="outline" onClick={() => navigate(`/edit/${l._id}`)}>Edit</UiButton>
+                    <UiButton variant="destructive" onClick={() => handleDelete(l._id)}>Delete</UiButton>
                   </Stack>
                 </CardActions>
               </Card>
