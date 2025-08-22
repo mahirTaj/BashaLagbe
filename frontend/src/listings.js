@@ -56,6 +56,28 @@ export default function Listings() {
   });
 
   return (
+<<<<<<< HEAD
+    <div>
+      <div className="listings-header">
+        <h2>My Listings</h2>
+        <div className="segmented">
+          <button className={`seg ${statusSeg === 'all' ? 'active' : ''}`} onClick={() => setStatusSeg('all')}>All</button>
+          <button className={`seg ${statusSeg === 'available' ? 'active' : ''}`} onClick={() => setStatusSeg('available')}>Available</button>
+          <button className={`seg ${statusSeg === 'rented' ? 'active' : ''}`} onClick={() => setStatusSeg('rented')}>Rented</button>
+        </div>
+        <div className="segmented">
+          <button className={`seg ${typeSeg === 'all' ? 'active' : ''}`} onClick={() => setTypeSeg('all')}>All types</button>
+          <button className={`seg ${typeSeg === 'Apartment' ? 'active' : ''}`} onClick={() => setTypeSeg('Apartment')}>Apartment</button>
+          <button className={`seg ${typeSeg === 'Room' ? 'active' : ''}`} onClick={() => setTypeSeg('Room')}>Room</button>
+          <button className={`seg ${typeSeg === 'Sublet' ? 'active' : ''}`} onClick={() => setTypeSeg('Sublet')}>Sublet</button>
+          <button className={`seg ${typeSeg === 'Commercial' ? 'active' : ''}`} onClick={() => setTypeSeg('Commercial')}>Commercial</button>
+          <button className={`seg ${typeSeg === 'Hostel' ? 'active' : ''}`} onClick={() => setTypeSeg('Hostel')}>Hostel</button>
+        </div>
+        <div className="header-actions">
+          <Link to="/add"><button className="btn">Add Listing</button></Link>
+        </div>
+      </div>
+=======
     <Box sx={{ mt: 3 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>My Listings</Typography>
@@ -131,6 +153,7 @@ export default function Listings() {
           </Box>
         </Stack>
       </Paper>
+>>>>>>> main
 
       {loading ? (
         <Stack alignItems="center" sx={{ py: 6 }}>
