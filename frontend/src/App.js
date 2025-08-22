@@ -39,7 +39,6 @@ function Nav() {
   };
 
   return (
-<<<<<<< HEAD
     <div className="nav">
       <span className="nav-title" onClick={() => navigate('/')}>BashaLagbe</span>
       <Link to="/">My Listings</Link>
@@ -60,19 +59,6 @@ function Nav() {
         <button className="icon-btn" onClick={switchUser}>Switch</button>
       </div>
     </div>
-=======
-    <AppBar position="sticky" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-  <Toolbar sx={{ maxWidth: 1400, width: '100%', mx: 'auto' }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mr: 2 }}>BashaLagbe</Typography>
-        <Button component={Link} to="/" color="inherit">My Listings</Button>
-        <Button component={Link} to="/add" variant="contained" sx={{ ml: 1 }}>Add Listing</Button>
-        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" sx={{ px: 1, py: 0.5, borderRadius: 999, bgcolor: 'grey.100', border: 1, borderColor: 'divider', fontWeight: 600 }}>{user.name}</Typography>
-          <IconButton size="small" onClick={switchUser} sx={{ border: 1, borderColor: 'divider' }}>↺</IconButton>
-        </Box>
-      </Toolbar>
-    </AppBar>
->>>>>>> main
   );
 }
 

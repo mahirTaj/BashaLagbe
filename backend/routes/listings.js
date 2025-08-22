@@ -21,11 +21,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-<<<<<<< HEAD
-// --------------------------------------------------
-// Create listing (owner required)
-// --------------------------------------------------
-=======
 // Helpers to map a stored URL to a local uploads file path and delete safely
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 function urlToUploadPath(url) {
@@ -52,7 +47,6 @@ async function unlinkSafe(filePath) {
 }
 
 // Create listing (requires userId)
->>>>>>> main
 router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
     const userId = getUserId(req);
