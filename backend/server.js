@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const cors = require('cors');  // connect frontend and backend
 const path = require('path');
 const multer = require('multer');
 const session = require('express-session');

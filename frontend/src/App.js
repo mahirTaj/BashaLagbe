@@ -8,6 +8,7 @@ import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
+import axios from 'axios';
 
 function Nav() {
   const { user, switchUser } = useAuth();

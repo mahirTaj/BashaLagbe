@@ -18,8 +18,27 @@ export default function Profile() {
   const [pwMessage, setPwMessage] = useState('');
   const navigate = useNavigate();
 
+  // Helper: logout and redirect
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
+  // Helper: handle axios errors
+  const handleAxiosError = (err) => {
+    if (err.response && err.response.status === 401) {
+      handleLogout();
+    } else {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
+    if (!token) {
+      handleLogout();
+      return;
+    }
     axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         setUser(res.data);
@@ -30,7 +49,9 @@ export default function Profile() {
           preferences: res.data.preferences || '',
           profilePic: res.data.profilePic || ''
         });
-      });
+      })
+      .catch(handleAxiosError);
+    // eslint-disable-next-line
   }, []);
 
   const handleChange = e => {
@@ -48,44 +69,45 @@ export default function Profile() {
     const token = localStorage.getItem('token');
     let updatedForm = { ...form };
 
-    // Handle profile picture upload
-    if (profilePicFile) {
-      const picData = new FormData();
-      picData.append('profilePic', profilePicFile);
-      const picRes = await axios.post('/api/auth/upload-profile-pic', picData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      updatedForm.profilePic = picRes.data.url;
-    }
-
-    axios.put('/api/auth/profile', updatedForm, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => {
-        setUser(res.data);
-        setForm({
-          ...form,
-          profilePic: res.data.profilePic // update the preview immediately
+    try {
+      // Handle profile picture upload
+      if (profilePicFile) {
+        const picData = new FormData();
+        picData.append('profilePic', profilePicFile);
+        const picRes = await axios.post('/api/auth/upload-profile-pic', picData, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-        setMessage('Profile updated!');
-        setEditing(false);
-      })
-      .catch(() => setMessage('Update failed.'));
+        updatedForm.profilePic = picRes.data.url;
+      }
+
+      const res = await axios.put('/api/auth/profile', updatedForm, { headers: { Authorization: `Bearer ${token}` } });
+      setUser(res.data);
+      setForm({
+        ...form,
+        profilePic: res.data.profilePic // update the preview immediately
+      });
+      setMessage('Profile updated!');
+      setEditing(false);
+    } catch (err) {
+      setMessage('Update failed.');
+      handleAxiosError(err);
+    }
   };
 
   const handlePasswordChange = e => {
     setPasswords({ ...passwords, [e.target.name]: e.target.value });
   };
 
-  const handlePasswordSubmit = e => {
+  const handlePasswordSubmit = async e => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    axios.post('/api/auth/change-password', passwords, { headers: { Authorization: `Bearer ${token}` } })
-      .then(() => setPwMessage('Password changed successfully!'))
-      .catch(() => setPwMessage('Password change failed.'));
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/login');
+    try {
+      await axios.post('/api/auth/change-password', passwords, { headers: { Authorization: `Bearer ${token}` } });
+      setPwMessage('Password changed successfully!');
+    } catch (err) {
+      setPwMessage('Password change failed.');
+      handleAxiosError(err);
+    }
   };
 
   if (!user) return <div>Loading...</div>;
