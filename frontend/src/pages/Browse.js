@@ -2,6 +2,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
+import WishlistButton from '../components/WishlistButton';
+
+
 
 // Public browse/search page (not user restricted)
 export default function Browse() {
@@ -200,9 +203,14 @@ export default function Browse() {
                 <span style={{ fontWeight:600 }}>৳{l.price}</span>
                 <span style={{ fontSize:12 }}>{l.type}</span>
               </div>
+               <div style={{ marginTop: 8 }}>
+                                <WishlistButton listingId={l._id} />
+                            </div>
+
             </Link>
           ))}
         </div>
+        
       )}
 
       {totalPages > 1 && (

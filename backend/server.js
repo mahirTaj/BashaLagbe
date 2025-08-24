@@ -7,6 +7,10 @@ const fs = require('fs');
 
 const listingsRoute = require('./routes/listings');
 
+// ✅ NEW: Import message & wishlist routes
+const messageRoutes = require('./routes/messages');
+const wishlistRoutes = require('./routes/wishlist');
+
 const app = express();
 
 app.use(cors());
@@ -18,6 +22,10 @@ try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
 app.use('/uploads', express.static(uploadsPath));
 
 app.use('/api/listings', listingsRoute);
+
+// ✅ NEW: Mount the new feature routes
+app.use('/api/messages', messageRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 const mongoURI = 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
@@ -39,4 +47,3 @@ app.use((err, req, res, next) => {
   }
   next();
 });
-

@@ -13,6 +13,12 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import WishlistPage from './pages/Wishlist';
+import MessageInterfacePage from './pages/MessageInterface'
+
+
+
+
 
 function Nav() {
   const { user, switchUser } = useAuth();
@@ -23,7 +29,10 @@ function Nav() {
   const [searchVal, setSearchVal] = useState(qParam);
 
   // keep input synced when navigating back/forward
-  useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
+  useEffect(() => { 
+    if (qParam !== searchVal) setSearchVal(qParam); 
+    // eslint-disable-next-line
+  }, [qParam]);
 
   const submitSearch = () => {
     const p = new URLSearchParams(location.search);
@@ -35,7 +44,8 @@ function Nav() {
 
   const clearSearch = () => {
     setSearchVal('');
-    const p = new URLSearchParams(location.search); p.delete('q');
+    const p = new URLSearchParams(location.search); 
+    p.delete('q');
     navigate({ pathname: '/browse', search: p.toString() });
   };
 
@@ -67,10 +77,13 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Listings />} />
-  <Route path="/browse" element={<Browse />} />
-  <Route path="/listing/:id" element={<ListingDetails />} />
-  <Route path="/add" element={<AddEditListing />} />
+      <Route path="/browse" element={<Browse />} />
+      <Route path="/listing/:id" element={<ListingDetails />} />
+      <Route path="/add" element={<AddEditListing />} />
       <Route path="/edit/:id" element={<AddEditListing />} />
+      <Route path="/wishlist" element={<WishlistPage />} />
+      <Route path="/messages/:landlordId" element={<MessageInterfacePage />} />
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
@@ -104,13 +117,14 @@ export default function App() {
       MuiButton: { styleOverrides: { root: { paddingInline: 20, minHeight: 44 } } },
       MuiChip: { styleOverrides: { root: { fontSize: '0.75rem', height: 28 } } },
       MuiCard: { styleOverrides: { root: { borderRadius: 16 } } },
-      MuiCardContent: { styleOverrides: { root: { padding: 16, '&:last-child': { paddingBottom: 16 } } } },
       MuiCardContent: { styleOverrides: { root: { padding: 12, '&:last-child': { paddingBottom: 12 } } } },
       MuiCardActions: { styleOverrides: { root: { padding: '8px 12px' } } },
       MuiToolbar: { defaultProps: { variant: 'dense' } },
     },
   });
+
   return (
+    // ✅ AuthProvider is already here — this ensures user state is global
     <AuthProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
