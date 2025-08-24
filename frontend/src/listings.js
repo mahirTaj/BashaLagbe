@@ -99,7 +99,6 @@ export default function Listings() {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn ghost" onClick={() => navigate(`/edit/${l._id}`)}>Edit</button>
-                  {/* View slots removed */}
                   <button className="btn danger" onClick={() => handleDelete(l._id)}>Delete</button>
                 </div>
               </div>

@@ -1,21 +1,19 @@
 import React, { createContext, useContext, useState } from 'react';
 
-// Two dummy users for now with roles
+// Two dummy users for now
 const USERS = [
-  { id: 'user_a', name: 'Alice', role: 'landlord', token: 'token_a' },
-  { id: 'user_b', name: 'Bob', role: 'tenant', token: 'token_b' },
+  { id: 'user_a', name: 'Alice' },
+  { id: 'user_b', name: 'Bob' },
 ];
 
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
   const [idx, setIdx] = useState(0);
-  const [role, setRole] = useState(USERS[idx].role);
   const user = USERS[idx] || { name: 'Guest' };
   const switchUser = () => setIdx((i) => (i === 0 ? 1 : 0));
-  const setUserRole = (r) => setRole(r);
 
-  const value = { user, switchUser, role, setUserRole, token: USERS[idx].token };
+  const value = { user, switchUser };
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
