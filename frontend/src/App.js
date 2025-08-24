@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Listings from './listings';
 import AddEditListing from './pages/AddEditListing';
+// slots feature removed
 import { AuthProvider, useAuth } from './auth';
 import OAuthSuccess from './pages/OAuthSuccess';
 import Profile from './pages/Profile';
@@ -16,6 +17,7 @@ function Nav() {
     <div className="nav">
       <span className="nav-title">BashaLagbe</span>
       <Link to="/listings">My Listings</Link>
+  {/* Available Slots removed */}
       <Link to="/profile" style={{ marginLeft: 8 }}>Profile</Link> {/* Add this line */}
       <Link to="/add" className="btn" style={{ marginLeft: 8 }}>Add Listing</Link>
       <div className="nav-spacer">
@@ -41,6 +43,7 @@ function AppRoutes() {
           <Listings />
         </ProtectedRoute>
       } />
+      {/* Slots routes removed */}
       <Route path="/add" element={
         <ProtectedRoute>
           <AddEditListing />

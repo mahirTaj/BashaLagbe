@@ -10,6 +10,7 @@ const passport = require('./config/passport');  // Import passport config
 
 const listingsRoute = require('./routes/listings');
 const authRoutes = require('./routes/auth');
+// bookings feature removed
 
 const app = express();
 
@@ -34,6 +35,9 @@ app.use(passport.session());
 
 // Use auth routes (including Google OAuth routes inside auth.js)
 app.use('/api/auth', authRoutes);
+
+// Bookings API
+// bookings routes removed
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
