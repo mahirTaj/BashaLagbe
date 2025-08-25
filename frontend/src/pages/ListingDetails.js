@@ -48,6 +48,9 @@ import SecurityIcon from '@mui/icons-material/Security';
 import OpacityIcon from '@mui/icons-material/Opacity';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -114,6 +117,17 @@ export default function ListingDetails() {
   const features = data.features || [];
   const utilities = data.utilitiesIncluded || [];
   const isOwner = user && data.userId === user.id;
+  const lat = Number.isFinite(Number(data?.lat)) ? Number(data.lat) : (Number.isFinite(Number(data?.location?.coordinates?.[1])) ? Number(data.location.coordinates[1]) : NaN);
+  const lng = Number.isFinite(Number(data?.lng)) ? Number(data.lng) : (Number.isFinite(Number(data?.location?.coordinates?.[0])) ? Number(data.location.coordinates[0]) : NaN);
+  const hasPoint = Number.isFinite(lat) && Number.isFinite(lng);
+  const markerIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  });
+  const BD_BOUNDS = [[20.5, 88.0], [26.7, 92.7]];
 
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
@@ -248,6 +262,29 @@ export default function ListingDetails() {
                 <Button size="small" sx={{ mt: 0.5, textTransform: 'none' }} onClick={() => setShowDescFull(v => !v)}>
                   {showDescFull ? 'Show less' : 'Read more'}
                 </Button>
+              )}
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Location</Typography>
+              {hasPoint ? (
+                <Box sx={{ height: 280, borderRadius: 2, overflow: 'hidden' }}>
+                  <MapContainer
+                    center={{ lat, lng }}
+                    zoom={14}
+                    style={{ height: '100%' }}
+                    maxBounds={BD_BOUNDS}
+                    maxBoundsViscosity={1.0}
+                  >
+                    <TileLayer
+                      attribution='&copy; OpenStreetMap contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[lat, lng]} icon={markerIcon} />
+                  </MapContainer>
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">Location not provided.</Typography>
               )}
             </Paper>
 

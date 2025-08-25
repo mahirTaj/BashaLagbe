@@ -166,7 +166,22 @@ export default function Listings() {
                       onClick={() => navigate(`/listing/${l._id}`)}
                       variant="text"
                       size="small"
-                      sx={{ fontWeight: 700, textTransform: 'none', px: 0, minWidth: 0, lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}
+                      sx={{ 
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        px: 0,
+                        minWidth: 0,
+                        lineHeight: 1.2,
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left',
+                        color: 'text.primary',
+                        position: 'relative',
+                        '&:hover': { color: 'text.primary' },
+                        '&::after': {
+                          content: '""', position: 'absolute', left: 0, right: '76%', bottom: -2, height: 2,
+                          background: 'linear-gradient(90deg,#facc15,#fde68a)', borderRadius: 2, transform: 'scaleX(0)', transformOrigin: 'left', transition: 'transform .25s ease'
+                        },
+                        '&:hover::after': { transform: 'scaleX(1)' }
+                      }}
                     >
                       {l.title}
                     </Button>
@@ -176,7 +191,7 @@ export default function Listings() {
                   </Typography>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 0.5 }}>৳{l.price}</Typography>
                 </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between', pt: 0 }}>
+                <CardActions sx={{ justifyContent: 'space-between', pt: 0.5 }}>
                   <Chip label={l.type} size="small" color="primary" />
                   <Stack direction="row" spacing={1}>
                     <UiButton variant="outline" onClick={() => navigate(`/edit/${l._id}`)}>Edit</UiButton>

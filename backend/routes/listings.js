@@ -102,9 +102,126 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
   videoUrl,
     sizeSqft: req.body.sizeSqft ? Number(req.body.sizeSqft) : 0,
     };
+
+    // Optional geo: only accept if within Bangladesh bounds
+    const lat = Number(req.body.lat);
+    const lng = Number(req.body.lng);
+    const inRange = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 20.5 && lat <= 26.7 && lng >= 88 && lng <= 92.7;
+    if (inRange) {
+      payload.lat = lat;
+      payload.lng = lng;
+      payload.location = { type: 'Point', coordinates: [lng, lat] };
+    }
     const listing = new Listing(payload);
     const saved = await listing.save();
     res.status(201).json(saved);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --------------------------------------------------
+// Map endpoints (Bangladesh-only)
+// - GET /api/listings/in-bounds?west&south&east&north
+// - GET /api/listings/near?lat&lng&radiusKm
+// --------------------------------------------------
+
+// Bangladesh bounding box (approx): lat 20.5..26.7, lng 88..92.7
+const BD_BOUNDS = { south: 20.5, north: 26.7, west: 88.0, east: 92.7 };
+
+function clampToBdBounds({ west, south, east, north }) {
+  return {
+    west: Math.max(BD_BOUNDS.west, Math.min(BD_BOUNDS.east, west)),
+    east: Math.max(BD_BOUNDS.west, Math.min(BD_BOUNDS.east, east)),
+    south: Math.max(BD_BOUNDS.south, Math.min(BD_BOUNDS.north, south)),
+    north: Math.max(BD_BOUNDS.south, Math.min(BD_BOUNDS.north, north)),
+  };
+}
+
+router.get('/in-bounds', async (req, res) => {
+  try {
+    let west = Number(req.query.west);
+    let south = Number(req.query.south);
+    let east = Number(req.query.east);
+    let north = Number(req.query.north);
+    if (![west, south, east, north].every(Number.isFinite)) {
+      return res.status(400).json({ error: 'Invalid bounds' });
+    }
+
+    ({ west, south, east, north } = clampToBdBounds({ west, south, east, north }));
+
+    const filter = {
+      location: {
+        $geoWithin: {
+          $geometry: {
+            type: 'Polygon',
+            coordinates: [[
+              [west, south],
+              [east, south],
+              [east, north],
+              [west, north],
+              [west, south],
+            ]],
+          },
+        },
+      },
+    };
+
+    const docs = await Listing.find(
+      filter,
+      { title: 1, price: 1, type: 1, photoUrls: 1, lat: 1, lng: 1, location: 1 }
+    ).limit(500).lean();
+
+    res.json(
+      docs.map((d) => ({
+        _id: d._id,
+        title: d.title,
+        price: d.price,
+        type: d.type,
+        lat: d.lat ?? d.location?.coordinates?.[1],
+        lng: d.lng ?? d.location?.coordinates?.[0],
+        photo: d.photoUrls?.[0] || '',
+      }))
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/near', async (req, res) => {
+  try {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const radiusKm = Number(req.query.radiusKm || '2');
+    const inBd = Number.isFinite(lat) && Number.isFinite(lng) && lat >= BD_BOUNDS.south && lat <= BD_BOUNDS.north && lng >= BD_BOUNDS.west && lng <= BD_BOUNDS.east;
+    if (!inBd) return res.status(400).json({ error: 'Point must be inside Bangladesh' });
+    const meters = Math.max(50, Math.min(50000, (Number.isFinite(radiusKm) ? radiusKm : 2) * 1000));
+
+    const docs = await Listing.find(
+      {
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [lng, lat] },
+            $maxDistance: meters,
+          },
+        },
+      },
+      { title: 1, price: 1, type: 1, photoUrls: 1, lat: 1, lng: 1, location: 1 }
+    )
+      .limit(200)
+      .lean();
+
+    res.json(
+      docs.map((d) => ({
+        _id: d._id,
+        title: d.title,
+        price: d.price,
+        type: d.type,
+        lat: d.lat ?? d.location?.coordinates?.[1],
+        lng: d.lng ?? d.location?.coordinates?.[0],
+        photo: d.photoUrls?.[0] || '',
+      }))
+    );
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -330,6 +447,17 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
   if (typeof req.body.contactName !== 'undefined') doc.contactName = req.body.contactName;
   if (typeof req.body.phone !== 'undefined') doc.phone = req.body.phone;
   if (typeof req.body.sizeSqft !== 'undefined') doc.sizeSqft = Number(req.body.sizeSqft) || 0;
+
+    // Optional geo updates within Bangladesh
+    if (typeof req.body.lat !== 'undefined' && typeof req.body.lng !== 'undefined') {
+      const lat = Number(req.body.lat);
+      const lng = Number(req.body.lng);
+      const inRange = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 20.5 && lat <= 26.7 && lng >= 88 && lng <= 92.7;
+      if (inRange) {
+        doc.lat = lat; doc.lng = lng;
+        doc.location = { type: 'Point', coordinates: [lng, lat] };
+      }
+    }
 
     doc.photoUrls = [...keep, ...newPhotoUrls];
     let removedVideoUrl = '';
