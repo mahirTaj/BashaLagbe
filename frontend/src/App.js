@@ -164,10 +164,8 @@ export default function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <BrowserRouter>
-          <Nav />
-          <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
-            <AppRoutes />
-          </Box>
+          {/* AppContent handles conditional Nav rendering based on authentication */}
+          <AppContent />
         </BrowserRouter>
       </ThemeProvider>
     </AuthProvider>
