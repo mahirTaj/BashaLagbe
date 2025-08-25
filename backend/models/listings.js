@@ -57,4 +57,18 @@ const ListingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Text index for keyword search (regex still used for flexible partials; index helps future $text queries)
+try {
+  ListingSchema.index({
+    title: 'text',
+    description: 'text',
+    area: 'text',
+    subdistrict: 'text',
+    district: 'text',
+    division: 'text',
+  });
+} catch (e) {
+  // index may already exist; ignore runtime errors during hot reload
+}
+
 module.exports = mongoose.model('Listing', ListingSchema);

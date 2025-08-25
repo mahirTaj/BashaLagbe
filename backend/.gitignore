@@ -1,0 +1,8 @@
+# Backend specific (root .gitignore already ignores node_modules & uploads)
+node_modules/
+uploads/
+.env
+*.log
+coverage/
+dist/
+build/
