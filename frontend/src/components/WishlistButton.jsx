@@ -9,25 +9,24 @@ export default function WishlistButton({ listingId }) {
   const [loading, setLoading] = useState(false);
 
   const toggleWishlist = async () => {
-  console.log('Wishlist button clicked'); // debug line
-  try {
-    setLoading(true);
-    if (!saved) {
-  alert('Added to cart ✅'); // fire immediately
-  await axios.post(`/api/wishlist`, { listingId });
-  setSaved(true);
-} else {
-  await axios.delete(`/api/wishlist/${listingId}`);
-  setSaved(false);
-}
-
-  } catch (err) {
-    console.error('Wishlist error:', err);
-  } finally {
-    setLoading(false);
-  }
-};
-
+    try {
+      setLoading(true);
+      if (!saved) {
+        alert('Added to wishlist ✅');
+        await axios.post('/api/wishlist', { listingId });
+        setSaved(true);
+      } else {
+        await axios.delete(`/api/wishlist/${listingId}`);
+        setSaved(false);
+      }
+      // 🔔 Tell wishlist page(s) to refresh
+      window.dispatchEvent(new Event('wishlistUpdated'));
+    } catch (err) {
+      console.error('Wishlist error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Tooltip title={saved ? 'Remove from Wishlist' : 'Add to Wishlist'}>
