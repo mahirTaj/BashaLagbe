@@ -11,6 +11,7 @@ const passport = require('./config/passport');  // Import passport config
 
 const listingsRoute = require('./routes/listings');
 const authRoutes = require('./routes/auth');
+const moveinRoutes = require('./routes/movein');
 
 const app = express();
 
@@ -42,6 +43,11 @@ app.use('/uploads', express.static(uploadsPath));
 
 // Listings routes
 app.use('/api/listings', listingsRoute);
+// Move-in scheduling routes
+app.use('/api/movein', moveinRoutes);
+
+// Load cron jobs (reminders)
+try { require('./cron/reminder'); } catch (e) { /* ignore if not present */ }
 
 const mongoURI = process.env.MONGO_URI;
 
