@@ -72,4 +72,22 @@ app.use((err, req, res, next) => {
 // Test route to check if auth route works
 app.get('/api/auth/test', (req, res) => res.send('Auth route works'));
 
+// Temporary debug route to list registered routes
+app.get('/__debug/routes', (req, res) => {
+  try {
+    const routes = [];
+    app._router.stack.forEach((m) => {
+      if (m.route && m.route.path) {
+        const methods = Object.keys(m.route.methods).join(',');
+        routes.push({ path: m.route.path, methods });
+      } else if (m.name === 'router' && m.handle && m.handle.stack) {
+        m.handle.stack.forEach((r) => {
+          if (r.route && r.route.path) routes.push({ path: r.route.path, methods: Object.keys(r.route.methods).join(',') });
+        });
+      }
+    });
+    res.json(routes);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = app;
