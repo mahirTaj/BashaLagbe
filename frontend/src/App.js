@@ -4,6 +4,7 @@ import Listings from './listings';
 import AddEditListing from './pages/AddEditListing';
 import Browse from './pages/Browse';
 import ListingDetails from './pages/ListingDetails';
+import MoveInScheduler from './pages/MoveInScheduler';
 import { AuthProvider, useAuth } from './auth';
 import OAuthSuccess from './pages/OAuthSuccess';
 import Profile from './pages/Profile';
@@ -97,6 +98,7 @@ function AppRoutes() {
       {/* Public browse */}
       <Route path="/" element={<Listings />} />
       <Route path="/browse" element={<Browse />} />
+  <Route path="/movein" element={<MoveInScheduler />} />
       <Route path="/listing/:id" element={<ListingDetails />} />
 
       <Route path="*" element={<Navigate to="/" />} />
