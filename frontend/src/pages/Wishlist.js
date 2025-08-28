@@ -6,13 +6,21 @@ export default function Wishlist() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const authHeaders = () => {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const fetchWishlist = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/api/wishlist');
-      setItems(res.data || []);
+      const res = await axios.get('/api/wishlist', { headers: authHeaders() });
+      // ✅ Safely extract listing docs from the wishlist object
+      const listings = res.data?.listings?.map(l => l.listing) || [];
+      setItems(listings);
     } catch (err) {
       console.error('Error fetching wishlist:', err);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -36,8 +44,8 @@ export default function Wishlist() {
     <List>
       {items.length === 0 && <p>No items in wishlist yet</p>}
       {items.map(item => (
-        <ListItem key={item.id}>
-          <ListItemText primary={item.title} />
+        <ListItem key={item._id}>
+          <ListItemText primary={item.title || 'Untitled Listing'} />
         </ListItem>
       ))}
     </List>

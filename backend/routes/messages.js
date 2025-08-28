@@ -3,8 +3,16 @@ const router = express.Router();
 const Message = require('../models/message');
 const { authMiddleware } = require('../middleware/auth');
 
+// Small helper to fake a user in demo mode
+const demoUserMiddleware = (req, res, next) => {
+  if (!req.user) {
+    req.user = { id: 'demo-user' }; // fallback ID
+  }
+  next();
+};
+
 // Get messages for a listing between current user & another user
-router.get('/:listingId', authMiddleware, async (req, res) => {
+router.get('/:listingId', demoUserMiddleware, authMiddleware, async (req, res) => {
   try {
     const { listingId } = req.params;
     const msgs = await Message.find({
@@ -22,7 +30,7 @@ router.get('/:listingId', authMiddleware, async (req, res) => {
 });
 
 // Send a message
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', demoUserMiddleware, authMiddleware, async (req, res) => {
   try {
     const { listing, receiver, content } = req.body;
     const msg = await Message.create({

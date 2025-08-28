@@ -3,13 +3,19 @@ import { Button } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
 import { useNavigate } from 'react-router-dom';
 
-export default function ContactLandlordButton({ landlordId, listingTitle }) {
+export default function ContactLandlordButton({ landlordId, listingId, listingTitle }) {
   const navigate = useNavigate();
 
   const handleClick = (e) => {
-    e.preventDefault(); // stops any default card/link navigation
-    // go to /messages/:landlordId, keep listing title in query for display
-    navigate(`/messages/${landlordId}?listing=${encodeURIComponent(listingTitle)}`);
+    e.preventDefault();
+    navigate('/messages', {
+      state: {
+        listingId,
+        receiverId: landlordId,          // aligns with ChatBox prop
+        listingTitle,
+        currentUserId: localStorage.getItem('userId') || 'demo-user' // optional: ID for "You"
+      }
+    });
   };
 
   return (

@@ -2,8 +2,14 @@
 const jwt = require('jsonwebtoken');
 
 function authMiddleware(req, res, next) {
-  // Look for "Authorization: Bearer <token>"
   const authHeader = req.header('Authorization');
+
+  // DEMO MODE: if no token but we want to run without login
+  if (!authHeader && process.env.DEMO_MODE === 'true') {
+    req.user = { id: 'demo-user' }; // Fake user ID for demo
+    return next();
+  }
+
   if (!authHeader) {
     return res.status(401).json({ message: 'No token provided' });
   }
@@ -11,7 +17,6 @@ function authMiddleware(req, res, next) {
   const token = authHeader.replace('Bearer ', '');
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
-    // Attach decoded payload (e.g., { id, name }) to the request
     req.user = decoded;
     next();
   } catch (err) {
