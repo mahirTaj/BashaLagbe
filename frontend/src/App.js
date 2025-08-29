@@ -6,6 +6,7 @@ import Browse from './pages/Browse';
 import ListingDetails from './pages/ListingDetails';
 import MapPage from './pages/Map';
 import { AuthProvider, useAuth } from './auth';
+import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import AppBar from '@mui/material/AppBar';
@@ -20,6 +21,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ExploreIcon from '@mui/icons-material/Explore';
 import MapIcon from '@mui/icons-material/Map';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 // Styled components for premium navbar
@@ -89,11 +91,23 @@ const NavButton = styled(Button)(({ theme }) => ({
 
 function Nav() {
   const { user, switchUser } = useAuth();
+  const { isAdminLoggedIn } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const qParam = params.get('q') || '';
   const [searchVal, setSearchVal] = useState(qParam);
+
+  // keep input synced when navigating back/forward
+  useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
+
+  const handleAdminClick = () => {
+    if (isAdminLoggedIn) {
+      navigate('/admin-panel');
+    } else {
+      navigate('/admin-login');
+    }
+  };
 
   // keep input synced when navigating back/forward
   useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
@@ -155,6 +169,10 @@ function Nav() {
           <NavButton startIcon={<MapIcon />} onClick={() => navigate('/map')} data-active={location.pathname.startsWith('/map')}>
             Map
           </NavButton>
+          {/* Market Samples link moved into Admin Panel */}
+          <NavButton onClick={handleAdminClick} data-active={location.pathname.startsWith('/admin')} sx={{ ml: 2, fontWeight: 700, color: isAdminLoggedIn ? '#4ade80' : '#facc15', border: `1px solid ${isAdminLoggedIn ? '#4ade80' : '#facc15'}`, borderRadius: 2 }}>
+            {isAdminLoggedIn ? 'Admin Panel' : 'Admin'}
+          </NavButton>
         </Box>
 
         {/* Search */}
@@ -187,17 +205,80 @@ function Nav() {
 }
 
 function AppRoutes() {
+  // Lazy import to avoid circular dependency
+  const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
+  const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
+  const WebScrapingUpload = React.lazy(() => import('./pages/WebScrapingUpload'));
+  const DataValidationInterface = React.lazy(() => import('./pages/DataValidationInterface'));
+  const ScrapedData = React.lazy(() => import('./pages/MarketSamples'));
+  const Analytics = React.lazy(() => import('./pages/Analytics'));
+  
   return (
     <Routes>
       <Route path="/" element={<Listings />} />
-  <Route path="/browse" element={<Browse />} />
-  <Route path="/listing/:id" element={<ListingDetails />} />
-  <Route path="/add" element={<AddEditListing />} />
+      <Route path="/browse" element={<Browse />} />
+      <Route path="/listing/:id" element={<ListingDetails />} />
+      <Route path="/add" element={<AddEditListing />} />
       <Route path="/edit/:id" element={<AddEditListing />} />
-  <Route path="/map" element={<MapPage />} />
+      <Route path="/map" element={<MapPage />} />
+      <Route path="/admin-login" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <AdminLogin />
+        </React.Suspense>
+      } />
+      <Route path="/admin-panel" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ProtectedAdminRoute>
+            <AdminPanel />
+          </ProtectedAdminRoute>
+        </React.Suspense>
+      } />
+      <Route path="/admin-panel/web-scraping" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ProtectedAdminRoute>
+            <WebScrapingUpload />
+          </ProtectedAdminRoute>
+        </React.Suspense>
+      } />
+      <Route path="/admin-panel/data-validation" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ProtectedAdminRoute>
+            <DataValidationInterface />
+          </ProtectedAdminRoute>
+        </React.Suspense>
+      } />
+      <Route path="/admin-panel/scraped-data" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ProtectedAdminRoute>
+            <ScrapedData />
+          </ProtectedAdminRoute>
+        </React.Suspense>
+      } />
+      <Route path="/admin-panel/analytics" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ProtectedAdminRoute>
+            <Analytics />
+          </ProtectedAdminRoute>
+        </React.Suspense>
+      } />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
+}
+
+// Protected route component for admin pages
+function ProtectedAdminRoute({ children }) {
+  const { isAdminLoggedIn, isLoading } = useAdminAuth();
+  
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  
+  if (!isAdminLoggedIn) {
+    return <Navigate to="/admin-login" replace />;
+  }
+  
+  return children;
 }
 
 export default function App() {
@@ -280,15 +361,17 @@ export default function App() {
   });
   return (
     <AuthProvider>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <Nav />
-          <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
-            <AppRoutes />
-          </Box>
-        </BrowserRouter>
-      </ThemeProvider>
+      <AdminAuthProvider>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <BrowserRouter>
+            <Nav />
+            <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
+              <AppRoutes />
+            </Box>
+          </BrowserRouter>
+        </ThemeProvider>
+      </AdminAuthProvider>
     </AuthProvider>
   );
 }

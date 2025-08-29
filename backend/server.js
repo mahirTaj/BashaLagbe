@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 
 const listingsRoute = require('./routes/listings');
+const adminRoute = require('./routes/admin');
 
 const app = express();
 
@@ -18,6 +19,7 @@ try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
 app.use('/uploads', express.static(uploadsPath));
 
 app.use('/api/listings', listingsRoute);
+app.use('/api/admin', adminRoute);
 
 const mongoURI = 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
