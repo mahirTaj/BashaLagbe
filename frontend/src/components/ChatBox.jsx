@@ -1,74 +1,108 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useEffect, useState, useRef } from 'react';
+import io from 'socket.io-client';
 
 export default function ChatBox({ listingId, receiverId }) {
-  // Alias for backward compatibility if any part of your app still calls it landlordId
-  const landlordId = receiverId;
-
   const [messages, setMessages] = useState([]);
-  const [content, setContent] = useState('');
+  const [input, setInput] = useState('');
+  const [typingStatus, setTypingStatus] = useState('');
+  const socketRef = useRef(null);
 
-  const authHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
-  const fetchMessages = async () => {
-    if (!listingId) return; // avoid API calls if ID is missing
-    try {
-      const res = await axios.get(`/api/messages/${listingId}`, { headers: authHeaders() });
-      setMessages(res.data || []);
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    }
-  };
-
+  // Join room & set up listeners
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 4000); // auto-refresh every 4s
-    return () => clearInterval(interval);
-  }, [listingId]);
+    if (!listingId || !receiverId) return;
 
-  const sendMessage = async () => {
-    if (!content.trim() || !landlordId) return;
-    try {
-      const res = await axios.post(
-        '/api/messages',
-        { listing: listingId, receiver: landlordId, content },
-        { headers: authHeaders() }
+    // ✅ Auto-detect backend URL (works with or without frontend .env)
+    const backendURL =
+      (process.env.REACT_APP_SOCKET_SERVER && process.env.REACT_APP_SOCKET_SERVER.trim()) ||
+      (process.env.NODE_ENV === 'development'
+        ? 'http://localhost:5000'
+        : window.location.origin);
+
+    // Connect
+    socketRef.current = io(backendURL, {
+      withCredentials: true,
+    });
+
+    // Join a specific listing's room
+    socketRef.current.emit('joinRoom', { listingId, receiverId });
+
+    // Incoming message
+    socketRef.current.on('receiveMessage', (message) => {
+      setMessages((prev) => [...prev, message]);
+    });
+
+    // Typing indicator
+    socketRef.current.on('typing', ({ from }) => {
+      setTypingStatus(from === receiverId ? 'Typing...' : '');
+    });
+
+    // Read receipts
+    socketRef.current.on('messageRead', ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, read: true } : msg
+        )
       );
-      setMessages(prev => [...prev, res.data]);
-      setContent('');
-    } catch (err) {
-      console.error('Error sending message:', err);
-    }
+    });
+
+    return () => {
+      socketRef.current.disconnect();
+    };
+  }, [listingId, receiverId]);
+
+  // Handle send
+  const handleSend = () => {
+    if (!input.trim()) return;
+
+    const messageData = {
+      id: Date.now(), // temp ID for UI
+      text: input,
+      from: 'me',
+      read: false,
+      createdAt: new Date(),
+    };
+
+    setMessages((prev) => [...prev, messageData]);
+
+    // Emit to server
+    socketRef.current.emit('sendMessage', {
+      listingId,
+      receiverId,
+      text: input,
+    });
+
+    setInput('');
+  };
+
+  // Emit typing
+  const handleTyping = () => {
+    socketRef.current.emit('typing', { listingId, to: receiverId });
   };
 
   return (
-    <div className="chat-box">
-      <div className="messages">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={
-              m.sender?._id === landlordId || m.sender === landlordId
-                ? "msg landlord"
-                : "msg user"
-            }
-          >
-            {m.content}
+    <div>
+      <div style={{ height: '300px', overflowY: 'auto', border: '1px solid #ccc', marginBottom: '0.5em' }}>
+        {messages.map((msg) => (
+          <div key={msg.id} style={{ margin: '0.2em 0' }}>
+            <strong>{msg.from === 'me' ? 'You' : 'Them'}:</strong> {msg.text}
+            {msg.read && <span style={{ fontSize: '0.8em', color: 'green' }}> ✓✓</span>}
           </div>
         ))}
+        {typingStatus && (
+          <div style={{ fontStyle: 'italic', color: 'gray' }}>{typingStatus}</div>
+        )}
       </div>
-      <div className="chat-input">
-        <input
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendMessage()}
-          placeholder="Type your message..."
-        />
-        <button onClick={sendMessage}>Send</button>
-      </div>
+
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleTyping}
+        style={{ width: '80%' }}
+      />
+      <button onClick={handleSend} style={{ width: '18%', marginLeft: '2%' }}>
+        Send
+      </button>
     </div>
   );
 }

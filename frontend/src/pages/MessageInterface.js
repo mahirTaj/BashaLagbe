@@ -7,13 +7,21 @@ export default function MessageInterfacePage() {
   const location = useLocation();
   const { landlordId: landlordIdFromParams } = useParams();
 
-  // Try to get data from router state first (preferred)
+  // Preferred: data passed via router state
   const { listingId, receiverId, listingTitle } = location.state || {};
+
+  // Resolve final landlordId — state wins over URL param
+  const landlordId = receiverId || landlordIdFromParams;
+
+  // Guard: don’t render until we have the essentials
+  if (!listingId || !landlordId) {
+    return <div>Loading chat…</div>;
+  }
 
   return (
     <MessageInterface
-      listingId={listingId || ''}
-      landlordId={receiverId || landlordIdFromParams || ''}
+      listingId={listingId}
+      landlordId={landlordId}
       listingTitle={listingTitle || ''}
     />
   );

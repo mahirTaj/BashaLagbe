@@ -1,15 +1,35 @@
 // src/components/ui/MessageInterface.jsx
-import { useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import ChatBox from '../ChatBox';
 
-export default function MessageInterface() {
-  const location = useLocation();
-  const { listingId, receiverId, currentUserId, listingTitle } = location.state || {};
+export default function MessageInterface({
+  listingId: propListingId,
+  landlordId: propLandlordId,
+  listingTitle: propListingTitle,
+  currentUserId: propCurrentUserId
+}) {
+  // read from URL params
+  const { landlordId: paramLandlordId } = useParams();
 
-  if (!listingId || !receiverId) {
+  // read from navigation state
+  const location = useLocation();
+  const state = location.state || {};
+
+  // final resolved values with fallbacks
+  const listingId = propListingId || state.listingId;
+  const landlordId = propLandlordId || paramLandlordId || state.receiverId;
+  const listingTitle = propListingTitle || state.listingTitle;
+  const currentUserId =
+    propCurrentUserId ||
+    state.currentUserId ||
+    localStorage.getItem('userId') ||
+    'demo-user';
+
+  if (!listingId || !landlordId) {
     return (
       <div style={{ padding: '1rem', color: 'red' }}>
-        Missing conversation details.  
+        Missing conversation details.
+        <br />
         Please navigate here via the Contact Landlord button.
       </div>
     );
@@ -20,11 +40,11 @@ export default function MessageInterface() {
       <h2>
         {listingTitle
           ? `${listingTitle} — Chat`
-          : `${currentUserId || 'You'} ↔ ${receiverId}`}
+          : `${currentUserId || 'You'} ↔ ${landlordId}`}
       </h2>
 
-      {/* ChatBox now fully handles fetching, sending, and live updates */}
-      <ChatBox listingId={listingId} receiverId={receiverId} />
+      {/* ChatBox handles fetching, sending, and live updates */}
+      <ChatBox listingId={listingId} receiverId={landlordId} />
     </div>
   );
 }

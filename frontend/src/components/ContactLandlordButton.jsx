@@ -7,16 +7,16 @@ export default function ContactLandlordButton({ landlordId, listingId, listingTi
   const navigate = useNavigate();
 
   const handleClick = (e) => {
-    e.preventDefault();
-    navigate('/messages', {
-      state: {
-        listingId,
-        receiverId: landlordId,          // aligns with ChatBox prop
-        listingTitle,
-        currentUserId: localStorage.getItem('userId') || 'demo-user' // optional: ID for "You"
-      }
-    });
-  };
+  e.preventDefault();
+  navigate(`/messages/${landlordId}`, {
+    state: {
+      listingId,
+      receiverId: landlordId,
+      listingTitle,
+      currentUserId: localStorage.getItem('userId') || 'demo-user'
+    }
+  });
+};
 
   return (
     <Button
