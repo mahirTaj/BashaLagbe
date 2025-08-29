@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Wishlist = require('../models/wishlist');
-const { authMiddleware } = require('../middleware/auth');
+const verifyToken = require('../middleware/auth'); // ✅ matches new export
+const requireAuth = verifyToken; // for clarity in route usage
 
 // Add listing to wishlist (auth removed for demo)
 router.post('/', async (req, res) => {

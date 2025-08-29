@@ -24,4 +24,5 @@ function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = { authMiddleware };
+// ✅ Export the function directly so `require('../middleware/auth')` returns a function
+module.exports = authMiddleware;

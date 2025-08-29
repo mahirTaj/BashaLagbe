@@ -6,7 +6,6 @@ const USERS = [
   { id: 'user_b', name: 'Bob' },
 ];
 
-
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -40,4 +39,9 @@ export function useAuth() {
   const ctx = useContext(AuthCtx);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
+}
+
+// ✅ NEW: Minimal addition for socket.js and API calls
+export function getToken() {
+  return localStorage.getItem('token');
 }

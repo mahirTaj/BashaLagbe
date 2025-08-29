@@ -11,10 +11,14 @@ require('dotenv').config();
 const listingsRoute = require('./routes/listings');
 const messageRoutes = require('./routes/messages');
 const wishlistRoutes = require('./routes/wishlist');
-const configureSocket = require('./socket');   // ✅ NEW: our socket setup
+const { initSocketIO } = require('./socket');  // ✅ NEW: our socket setup
 
 const app = express();
-const server = http.createServer(app);         // ✅ wrap app in HTTP server
+const server = http.createServer(app);  
+const notificationsRoute = require('./routes/notifications');
+app.use('/api/notifications', notificationsRoute);
+
+       // ✅ wrap app in HTTP server
 
 // ✅ NEW: set up Socket.IO
 const io = new Server(server, {
@@ -24,7 +28,18 @@ const io = new Server(server, {
     credentials: true
   }
 });
-configureSocket(io);                           // ✅ call our socket handler
+initSocketIO(server);                           // ✅ call our socket handler
+
+// ----- ADD: Expose io globally to routes/middleware (non-intrusive) -----
+app.set('io', io);                             // ADD: make io available via req.app.get('io')
+app.use((req, res, next) => {                  // ADD: direct access as req.io for convenience
+  req.io = io;
+  next();
+});
+// ------------------------------------------------------------------------
+
+// ✅ EXPORT io so utils/sendNotification.js can import it
+module.exports.io = io;
 
 app.use(cors());
 app.use(express.json());

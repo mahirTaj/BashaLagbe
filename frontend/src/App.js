@@ -82,7 +82,9 @@ function AppRoutes() {
       <Route path="/add" element={<AddEditListing />} />
       <Route path="/edit/:id" element={<AddEditListing />} />
       <Route path="/wishlist" element={<WishlistPage />} />
-      <Route path="/messages/:landlordId" element={<MessageInterfacePage />} />
+       <Route path="/messages" element={<MessageInterfacePage />} />
+      <Route path="/messages/:threadId" element={<MessageInterfacePage />} />
+
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

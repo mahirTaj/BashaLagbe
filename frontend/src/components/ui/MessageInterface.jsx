@@ -9,7 +9,7 @@ export default function MessageInterface({
   currentUserId: propCurrentUserId
 }) {
   // read from URL params
-  const { landlordId: paramLandlordId } = useParams();
+  const { landlordId: paramLandlordId, threadId: paramThreadId } = useParams();
 
   // read from navigation state
   const location = useLocation();
@@ -25,7 +25,10 @@ export default function MessageInterface({
     localStorage.getItem('userId') ||
     'demo-user';
 
-  if (!listingId || !landlordId) {
+  // NEW: threadId from params or state
+  const threadId = paramThreadId || state.threadId || null;
+
+  if (!threadId && (!listingId || !landlordId)) {
     return (
       <div style={{ padding: '1rem', color: 'red' }}>
         Missing conversation details.
@@ -40,11 +43,15 @@ export default function MessageInterface({
       <h2>
         {listingTitle
           ? `${listingTitle} — Chat`
-          : `${currentUserId || 'You'} ↔ ${landlordId}`}
+          : `${currentUserId || 'You'} ↔ ${landlordId || 'Landlord'}`}
       </h2>
 
       {/* ChatBox handles fetching, sending, and live updates */}
-      <ChatBox listingId={listingId} receiverId={landlordId} />
+      <ChatBox
+        listingId={listingId}
+        receiverId={landlordId}
+        threadId={threadId} // ✅ NEW: pass threadId if available
+      />
     </div>
   );
 }

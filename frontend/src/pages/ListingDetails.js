@@ -51,6 +51,8 @@ import SecurityIcon from '@mui/icons-material/Security';
 import OpacityIcon from '@mui/icons-material/Opacity';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import NotificationBell from '../pages/NotificationsBell';
+
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -61,6 +63,8 @@ export default function ListingDetails() {
   const [error, setError] = useState('');
   const [mainIdx, setMainIdx] = useState(0);
   const [showDescFull, setShowDescFull] = useState(false);
+  
+
 
   useEffect(() => {
     let active = true;
@@ -117,6 +121,8 @@ export default function ListingDetails() {
   const features = data.features || [];
   const utilities = data.utilitiesIncluded || [];
   const isOwner = user && data.userId === user.id;
+  console.log('[ListingDetails] data:', data);
+
 
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
@@ -154,6 +160,7 @@ export default function ListingDetails() {
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       preload="metadata"
                     />
+                    <NotificationBell userId={user._id} token={user.token} />
                   </Box>
                 )
               ) : (
@@ -221,6 +228,8 @@ export default function ListingDetails() {
                 </Box>
               </Stack>
             </Box>
+             
+
           </Paper>
 
             <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
@@ -253,7 +262,7 @@ export default function ListingDetails() {
                 </Button>
               )}
             </Paper>
-
+              
             {/* Facilities & Utilities moved to sidebar under Landlord Contact */}
         </Box>
         <Box>
@@ -288,7 +297,20 @@ export default function ListingDetails() {
                {/* ✅ Added buttons here */}
           <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
           <WishlistButton listingId={data._id} />
-          <ContactLandlordButton landlordId={data.landlordId} listingTitle={data.title} />
+    <ContactLandlordButton
+  landlordId={
+    data.landlordId ||
+    data.owner?._id ||
+    data.userId ||
+    'demo_landlord' // fallback so it's never undefined
+  }
+  listingTitle={data.title}
+  listingId={data._id}
+/>
+
+
+
+
          
 
             </Box>
@@ -382,6 +404,7 @@ function FeatureBadge({ feature }) {
   );
 }
 
+
 function RentRow({ icon, label, value, bold }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -393,3 +416,5 @@ function RentRow({ icon, label, value, bold }) {
     </Box>
   );
 }
+
+
