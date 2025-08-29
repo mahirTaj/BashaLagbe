@@ -1,11 +1,8 @@
 {
-<<<<<<< HEAD
-	"name": "bashalagbe-root",
-	"private": true,
-	"license": "MIT"
-=======
   "name": "bashalagbe",
   "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
   "main": "index.js",
   "devDependencies": {},
   "scripts": {
@@ -17,11 +14,9 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/mahirTaj/BashaLagbe/issues"
   },
   "homepage": "https://github.com/mahirTaj/BashaLagbe#readme",
   "description": ""
->>>>>>> main
 }
