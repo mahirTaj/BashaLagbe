@@ -105,13 +105,13 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
     const saved = await listing.save();
 
     // ✅ Send notification for new listing
-    sendNotification(
-      userId,
-      'listing_created',
-      'New Listing Added',
-      `Your listing "${saved.title}" has been successfully created!`,
-      `/listing/${saved._id}`
-    ).catch(() => {});
+ sendNotification(
+  userId,
+  'listing_created',
+  'Listing Added',
+  `Your listing "${saved.title}" has been added!`,
+  `/listing/${saved._id}`
+).catch(() => {});
 
     res.status(201).json(saved);
   } catch (err) {
