@@ -7,7 +7,7 @@ const { getIO } = require('../socket');
  * Saves it in the database and emits via Socket.io to the user's room.
  * 
  * @param {string} userId - The user ID to notify.
- * @param {string} type - Type of notification (e.g., listing_approval, listing_update).
+ * @param {string} type - Type of notification (message, listing_approval, rent_change, listing_created, listing_updated).
  * @param {string} title - Notification title.
  * @param {string} message - Notification message.
  * @param {string} [url] - Optional URL the frontend can navigate to.
@@ -16,6 +16,13 @@ const { getIO } = require('../socket');
 async function sendNotification(userId, type, title, message, url = '') {
   if (!userId) return;
 
+  // ✅ Ensure type is valid
+  const validTypes = ['message', 'listing_approval', 'rent_change', 'listing_created', 'listing_updated'];
+  if (!validTypes.includes(type)) {
+    console.warn(`[sendNotification] Invalid type "${type}", defaulting to "message"`);
+    type = 'message';
+  }
+
   try {
     // 1️⃣ Save notification in the database
     const notif = new Notification({
@@ -23,7 +30,7 @@ async function sendNotification(userId, type, title, message, url = '') {
       type,
       title,
       message,
-      url,
+      link: url,  // keep property name consistent with notifications model
       isRead: false,
     });
     const saved = await notif.save();

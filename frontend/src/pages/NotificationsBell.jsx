@@ -30,10 +30,14 @@ export default function NotificationBell({ userId, token }) {
     const socket = io('http://localhost:5000', { auth: { token } });
     socket.emit('join', `user:${userId}`);
 
-    socket.on('newNotification', (notif) => {
+    // Listen for notifications from backend
+    socket.on('notification', (notif) => { // changed from 'newNotification' to 'notification' to match backend emit
       setNotifications(prev => [notif, ...prev]);
       setUnreadCount(prev => prev + 1);
     });
+
+    socket.on('connect', () => console.log('[socket] connected:', socket.id));
+    socket.on('disconnect', () => console.log('[socket] disconnected:', socket.id));
 
     return () => socket.disconnect();
   }, [userId, token]);
