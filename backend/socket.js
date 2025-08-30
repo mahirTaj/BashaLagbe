@@ -1,5 +1,4 @@
 // backend/socket.js
-const jwt = require('jsonwebtoken');
 let ioInstance = null;
 
 function initSocketIO(server, options = {}) {
@@ -14,30 +13,12 @@ function initSocketIO(server, options = {}) {
   io.on('connection', (socket) => {
     console.log('[socket] connected:', socket.id);
 
-    // Client should emit 'auth' with token once connected
-    socket.on('auth', (token) => {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.user = { id: decoded.id || decoded._id };
-        socket.join(`user:${socket.user.id}`);
-        console.log('[socket] authenticated user:', socket.user.id);
-        socket.emit('auth:ok');
-      } catch (e) {
-        console.warn('[socket] auth failed');
-        socket.emit('auth:error', 'Invalid token');
-      }
-    });
-
-    socket.on('thread:join', (threadId) => {
-      if (!threadId) return;
-      socket.join(`thread:${threadId}`);
-      console.log('[socket] joined thread room:', threadId);
-    });
-
-    socket.on('typing', ({ threadId, isTyping }) => {
-      if (!threadId) return;
-      socket.to(`thread:${threadId}`).emit('typing', { threadId, isTyping: !!isTyping });
-    });
+    // ✅ Get userId from query directly
+    const { userId } = socket.handshake.query;
+    if (userId) {
+      socket.join(`user:${userId}`);
+      console.log(`[socket] User ${userId} joined their room`);
+    }
 
     socket.on('disconnect', () => {
       console.log('[socket] disconnected:', socket.id);

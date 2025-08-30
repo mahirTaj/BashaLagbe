@@ -1,79 +1,126 @@
-import { useEffect, useState } from 'react'; 
-import io from 'socket.io-client';
-import axios from 'axios';
+// src/pages/NotificationBell.jsx
+import React, { useEffect, useState, useRef } from 'react';
+import { io } from 'socket.io-client';
 
 export default function NotificationBell({ userId, token }) {
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
+  // Fetch existing notifications
   useEffect(() => {
-    // fetch existing notifications
-    axios.get(`${process.env.REACT_APP_API_URL}/api/notifications`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(res => setNotifications(res.data));
+    if (!userId || !token) return;
 
-    // connect to socket
-    const socket = io(process.env.REACT_APP_API_URL, { query: { userId } });
+    fetch('http://localhost:5000/api/notifications', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setNotifications(data);
+        setUnreadCount(data.filter(n => !n.isRead).length);
+      })
+      .catch(console.error);
+  }, [userId, token]);
+
+  // Socket.io real-time updates
+  useEffect(() => {
+    if (!userId) return;
+
+    const socket = io('http://localhost:5000', { auth: { token } });
+    socket.emit('join', `user:${userId}`);
 
     socket.on('newNotification', (notif) => {
       setNotifications(prev => [notif, ...prev]);
+      setUnreadCount(prev => prev + 1);
     });
 
     return () => socket.disconnect();
   }, [userId, token]);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Handle click outside dropdown to close
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // ✅ Mark notification as read
-  const handleMarkRead = async (id) => {
+  const markAsRead = async (id) => {
     try {
-      await axios.patch(
-        `${process.env.REACT_APP_API_URL}/api/notifications/${id}/read`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setNotifications(prev =>
-        prev.map(n => n._id === id ? { ...n, isRead: true } : n)
-      );
+      await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
-      console.error('Failed to mark as read', err);
+      console.error(err);
     }
   };
 
   return (
-    <div className="notification-bell" style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(!open)}>
-        🔔 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-      </button>
+    <div style={{ position: 'relative', zIndex: 10000 }} ref={dropdownRef}>
+      <div
+        style={{ cursor: 'pointer', position: 'relative', fontSize: '1.5rem' }}
+        onClick={() => setOpen(!open)}
+      >
+        🔔
+        {unreadCount > 0 && (
+          <span style={{
+            position: 'absolute',
+            top: -5,
+            right: -5,
+            background: 'red',
+            color: 'white',
+            borderRadius: '50%',
+            padding: '2px 6px',
+            fontSize: '0.7rem',
+            zIndex: 10001
+          }}>
+            {unreadCount}
+          </span>
+        )}
+      </div>
 
       {open && (
-        <div className="dropdown" 
-             style={{ 
-               position: 'absolute', 
-               top: '100%', 
-               right: 0, 
-               background: '#fff', 
-               border: '1px solid #ccc', 
-               width: '300px',
-               maxHeight: '400px',
-               overflowY: 'auto',
-               zIndex: 1000
-             }}>
-          {notifications.length === 0 && <p>No notifications</p>}
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          marginTop: 8,
+          width: 300,
+          maxHeight: 400,
+          overflowY: 'auto',
+          background: 'white',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          borderRadius: 8,
+          zIndex: 10002
+        }}>
+          {notifications.length === 0 && (
+            <div style={{ padding: 12, textAlign: 'center', color: '#555' }}>No notifications</div>
+          )}
           {notifications.map(n => (
-            <div 
-              key={n._id} 
-              className={`notif ${n.isRead ? '' : 'unread'}`} 
-              style={{ 
-                padding: '10px', 
-                borderBottom: '1px solid #eee', 
-                background: n.isRead ? '#f9f9f9' : '#e6f7ff', 
-                cursor: 'pointer' 
+            <div
+              key={n._id}
+              style={{
+                padding: 10,
+                borderBottom: '1px solid #eee',
+                backgroundColor: n.isRead ? 'white' : '#f0f8ff',
+                cursor: 'pointer'
               }}
-              onClick={() => handleMarkRead(n._id)}
+              onClick={() => {
+                markAsRead(n._id);
+                if (n.url) window.location.href = n.url;
+              }}
             >
               <strong>{n.title}</strong>
-              <p style={{ margin: 0 }}>{n.message}</p>
+              <div style={{ fontSize: '0.85rem', color: '#555' }}>{n.message}</div>
+              <div style={{ fontSize: '0.7rem', color: '#999' }}>
+                {new Date(n.createdAt).toLocaleString()}
+              </div>
             </div>
           ))}
         </div>

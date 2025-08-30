@@ -4,7 +4,7 @@ const Listing = require('../models/listings');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { sendNotification } = require('../utils/sendNotifications'); // ✅ Added for notifications
+const {sendNotification} =require('../utils/sendNotifications');
 
 // --------------------------------------------------
 // Helpers & upload config
@@ -47,9 +47,8 @@ async function unlinkSafe(filePath) {
   }
 }
 
-// --------------------------------------------------
 // Create listing (requires userId)
-// --------------------------------------------------
+// Create listing (requires userId)
 router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -86,18 +85,14 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
       balcony: req.body.balcony ? Number(req.body.balcony) : 0,
       personCount: req.body.personCount ? Number(req.body.personCount) : 1,
       isRented: req.body.isRented === 'true' || req.body.isRented === true,
-      features: req.body.features
-        ? req.body.features.split(',').map((s) => s.trim()).filter(Boolean)
-        : [],
+      features: req.body.features ? req.body.features.split(',').map(s => s.trim()).filter(Boolean) : [],
       floor: Number(req.body.floor),
       totalFloors: req.body.totalFloors ? Number(req.body.totalFloors) : 0,
       furnishing: req.body.furnishing || 'Unfurnished',
       deposit: req.body.deposit ? Math.max(0, Number(req.body.deposit)) : 0,
       serviceCharge: req.body.serviceCharge ? Math.max(0, Number(req.body.serviceCharge)) : 0,
       negotiable: req.body.negotiable === 'true' || req.body.negotiable === true,
-      utilitiesIncluded: req.body.utilitiesIncluded
-        ? req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean)
-        : [],
+      utilitiesIncluded: req.body.utilitiesIncluded ? req.body.utilitiesIncluded.split(',').map(s => s.trim()).filter(Boolean) : [],
       contactName: req.body.contactName || '',
       phone: req.body.phone || '',
       availableFrom: new Date(req.body.availableFrom),
@@ -109,14 +104,14 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
     const listing = new Listing(payload);
     const saved = await listing.save();
 
-    // ✅ Send notification after creation
-    await sendNotification(
+    // ✅ Send notification for new listing
+    sendNotification(
       userId,
-      'listing_approval',
-      'Listing Created',
-      `Your listing "${saved.title}" was created successfully.`,
-      `/listings/${saved._id}`
-    );
+      'listing_created',
+      'New Listing Added',
+      `Your listing "${saved.title}" has been successfully created!`,
+      `/listing/${saved._id}`
+    ).catch(() => {});
 
     res.status(201).json(saved);
   } catch (err) {
@@ -142,19 +137,143 @@ router.get('/', async (req, res) => {
 // Advanced search endpoint (public browse)
 // --------------------------------------------------
 router.get('/search', async (req, res) => {
-  // ... all existing search logic remains unchanged ...
+  try {
+    const {
+      q,
+      type,
+      division,
+      district,
+      subdistrict,
+      area,
+      priceMin,
+      priceMax,
+      roomsMin,
+      roomsMax,
+      bathroomsMin,
+      bathroomsMax,
+      personMin,
+      personMax,
+      balconyMin,
+      balconyMax,
+      serviceChargeMin,
+      serviceChargeMax,
+      page = '1',
+      limit = '20',
+      sort = 'newest',
+      isRented,
+    } = req.query;
+
+    const filter = {};
+
+    if (q && q.trim()) {
+      const kw = q.trim();
+      filter.$or = [
+        { title: { $regex: kw, $options: 'i' } },
+        { description: { $regex: kw, $options: 'i' } },
+        { area: { $regex: kw, $options: 'i' } },
+        { subdistrict: { $regex: kw, $options: 'i' } },
+        { district: { $regex: kw, $options: 'i' } },
+        { division: { $regex: kw, $options: 'i' } },
+      ];
+    }
+
+    if (type) {
+      const types = type.split(',').map(t => t.trim()).filter(Boolean);
+      if (types.length === 1) filter.type = types[0];
+      else if (types.length > 1) filter.type = { $in: types };
+    }
+
+    if (division) filter.division = division;
+    if (district) filter.district = district;
+    if (subdistrict) filter.subdistrict = subdistrict;
+    if (area) filter.area = area;
+
+    if (priceMin || priceMax) {
+      filter.price = {};
+      if (priceMin) filter.price.$gte = Number(priceMin);
+      if (priceMax) filter.price.$lte = Number(priceMax);
+    }
+
+    if (roomsMin || roomsMax) {
+      filter.rooms = {};
+      if (roomsMin) filter.rooms.$gte = Number(roomsMin);
+      if (roomsMax) filter.rooms.$lte = Number(roomsMax);
+    }
+
+    if (bathroomsMin || bathroomsMax) {
+      filter.bathrooms = {};
+      if (bathroomsMin) filter.bathrooms.$gte = Number(bathroomsMin);
+      if (bathroomsMax) filter.bathrooms.$lte = Number(bathroomsMax);
+    }
+
+    if (personMin || personMax) {
+      filter.personCount = {};
+      if (personMin) filter.personCount.$gte = Number(personMin);
+      if (personMax) filter.personCount.$lte = Number(personMax);
+    }
+
+    if (balconyMin || balconyMax) {
+      filter.balcony = {};
+      if (balconyMin) filter.balcony.$gte = Number(balconyMin);
+      if (balconyMax) filter.balcony.$lte = Number(balconyMax);
+    }
+
+    if (serviceChargeMin || serviceChargeMax) {
+      filter.serviceCharge = {};
+      if (serviceChargeMin) filter.serviceCharge.$gte = Number(serviceChargeMin);
+      if (serviceChargeMax) filter.serviceCharge.$lte = Number(serviceChargeMax);
+    }
+
+    if (typeof isRented !== 'undefined') {
+      if (isRented === 'true') filter.isRented = true;
+      else if (isRented === 'false') filter.isRented = false;
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt: 1 },
+      price_asc: { price: 1 },
+      price_desc: { price: -1 },
+    };
+    const sortOpt = sortMap[sort] || sortMap.newest;
+
+    const [data, total] = await Promise.all([
+      Listing.find(filter).sort(sortOpt).skip(skip).limit(limitNum),
+      Listing.countDocuments(filter),
+    ]);
+
+    res.json({
+      data,
+      page: pageNum,
+      pageSize: data.length,
+      limit: limitNum,
+      total,
+      hasMore: skip + data.length < total,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --------------------------------------------------
 // Get single listing
 // --------------------------------------------------
 router.get('/:id', async (req, res) => {
-  // ... existing single listing logic unchanged ...
+  try {
+    const doc = await Listing.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Not found' });
+    res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// --------------------------------------------------
 // Update listing (only by owner)
-// --------------------------------------------------
+// Update listing (only by owner)
 router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -163,32 +282,101 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
     const doc = await Listing.findOne({ _id: req.params.id, userId });
     if (!doc) return res.status(404).json({ error: 'Not found or not owner' });
 
+    const originalPhotoUrls = Array.isArray(doc.photoUrls) ? [...doc.photoUrls] : [];
+    const originalVideoUrl = doc.videoUrl || '';
+    const originalPrice = doc.price; // ✅ Save original price to compare later
+
     const base = `${req.protocol}://${req.get('host')}`;
     const newPhotoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
     const keep = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : doc.photoUrls;
 
-    const originalPhotoUrls = Array.isArray(doc.photoUrls) ? [...doc.photoUrls] : [];
-    const originalVideoUrl = doc.videoUrl || '';
+    // Update fields
+    doc.title = req.body.title ?? doc.title;
+    doc.description = req.body.description ?? doc.description;
+    doc.type = req.body.type ?? doc.type;
+    if (typeof req.body.price !== 'undefined') {
+      const n = Number(req.body.price);
+      doc.price = Number.isFinite(n) && n > 0 ? n : 0;
+    }
+    if (req.body.availableFrom) doc.availableFrom = new Date(req.body.availableFrom);
+    if (typeof req.body.rooms !== 'undefined') doc.rooms = Number(req.body.rooms);
+    if (req.body.bathrooms) doc.bathrooms = Number(req.body.bathrooms);
+    if (req.body.balcony) doc.balcony = Number(req.body.balcony);
+    if (req.body.personCount) doc.personCount = Number(req.body.personCount);
+    if (typeof req.body.isRented !== 'undefined') doc.isRented = req.body.isRented === 'true' || req.body.isRented === true;
+    if (req.body.features) doc.features = req.body.features.split(',').map((s) => s.trim()).filter(Boolean);
 
-    // ... all your existing field updates here unchanged ...
+    if (typeof req.body.division !== 'undefined') doc.division = req.body.division;
+    if (typeof req.body.district !== 'undefined') doc.district = req.body.district;
+    if (typeof req.body.subdistrict !== 'undefined') doc.subdistrict = req.body.subdistrict;
+    if (typeof req.body.area !== 'undefined') doc.area = req.body.area;
+    if (typeof req.body.road !== 'undefined') doc.road = req.body.road;
+    if (typeof req.body.houseNo !== 'undefined') doc.houseNo = req.body.houseNo;
+    if (typeof req.body.floor !== 'undefined') doc.floor = Number(req.body.floor);
+    if (typeof req.body.totalFloors !== 'undefined') doc.totalFloors = Number(req.body.totalFloors) || 0;
+    if (typeof req.body.furnishing !== 'undefined') doc.furnishing = req.body.furnishing;
+    if (typeof req.body.deposit !== 'undefined') doc.deposit = Math.max(0, Number(req.body.deposit)) || 0;
+    if (typeof req.body.serviceCharge !== 'undefined') doc.serviceCharge = Math.max(0, Number(req.body.serviceCharge)) || 0;
+    if (typeof req.body.negotiable !== 'undefined') doc.negotiable = req.body.negotiable === 'true' || req.body.negotiable === true;
+    if (typeof req.body.utilitiesIncluded !== 'undefined') doc.utilitiesIncluded = req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean);
+    if (typeof req.body.contactName !== 'undefined') doc.contactName = req.body.contactName;
+    if (typeof req.body.phone !== 'undefined') doc.phone = req.body.phone;
+    if (typeof req.body.sizeSqft !== 'undefined') doc.sizeSqft = Number(req.body.sizeSqft) || 0;
+
+    doc.photoUrls = [...keep, ...newPhotoUrls];
+    let removedVideoUrl = '';
+    if (req.files?.video?.[0]) {
+      removedVideoUrl = originalVideoUrl;
+      doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
+    } else if (req.body.removeVideo === 'true') {
+      removedVideoUrl = originalVideoUrl;
+      doc.videoUrl = '';
+    } else if (req.body.existingVideoUrl) {
+      doc.videoUrl = req.body.existingVideoUrl;
+    }
+
+    // Basic validation
+    const must = {
+      title: doc.title,
+      price: doc.price,
+      type: doc.type,
+      floor: doc.floor,
+      rooms: doc.rooms,
+      availableFrom: doc.availableFrom,
+      division: doc.division,
+      district: doc.district,
+      subdistrict: doc.subdistrict,
+      area: doc.area,
+      phone: doc.phone,
+    };
+    const missing = Object.entries(must).filter(([k, v]) => {
+      if (k === 'floor') return !(typeof v === 'number') || v < 0;
+      if (k === 'rooms') return !(typeof v === 'number') || v < 0;
+      return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
+    }).map(([k]) => k);
+    if (!doc.photoUrls.length) missing.push('photos');
+    if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
 
     const updated = await doc.save();
 
-    // ✅ Send notification after update
-    await sendNotification(
-      userId,
-      'rent_change',
-      'Listing Updated',
-      `Your listing "${updated.title}" was updated.`,
-      `/listings/${updated._id}`
-    );
-
+    // Delete removed files
     const removedPhotos = originalPhotoUrls.filter((u) => !doc.photoUrls.includes(u));
     const pathsToDelete = [
       ...removedPhotos.map(urlToUploadPath),
-      urlToUploadPath(originalVideoUrl),
+      urlToUploadPath(removedVideoUrl),
     ].filter(Boolean);
     Promise.all(pathsToDelete.map(unlinkSafe)).catch(() => {});
+
+    // ✅ Send notification only if rent changed
+    if (originalPrice !== doc.price) {
+      sendNotification(
+        userId,
+        'listing_updated',
+        'Rent Updated',
+        `The rent for "${doc.title}" has been updated!`,
+        `/listing/${doc._id}`
+      ).catch(() => {});
+    }
 
     res.json(updated);
   } catch (err) {
@@ -196,11 +384,26 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
   }
 });
 
+
 // --------------------------------------------------
 // Delete listing (owner only)
 // --------------------------------------------------
 router.delete('/:id', async (req, res) => {
-  // ... existing delete logic unchanged ...
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+
+    const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
+    if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });
+
+    const fileUrls = [...(deleted.photoUrls || []), deleted.videoUrl || ''].filter(Boolean);
+    const filePaths = fileUrls.map(urlToUploadPath).filter(Boolean);
+    Promise.all(filePaths.map(unlinkSafe)).catch(() => {});
+
+    res.json({ message: 'Listing deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
