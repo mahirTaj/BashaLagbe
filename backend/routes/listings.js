@@ -5,6 +5,7 @@ const Listing = require('../models/listings');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const authMiddleware = require('../middleware/auth');
 const {sendNotification} =require('../utils/sendNotifications');
 
 // --------------------------------------------------
@@ -49,9 +50,9 @@ async function unlinkSafe(filePath) {
 }
 
 // Create listing (requires userId)
-router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+router.post('/',   authMiddleware, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = req.user._id;
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     const base = `${req.protocol}://${req.get('host')}`;
@@ -102,20 +103,24 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
     };
 
     const listing = new Listing(payload);
-    const saved = await listing.save();
-// ✅ Send notification for new listing with valid ObjectId
+const saved = await listing.save();
+
+// ✅ Send notification for new listing
 try {
   console.log(`[Notification] Sending listing_created for userId: ${userId}`);
   await sendNotification(
-    mongoose.Types.ObjectId(userId), // <-- convert to ObjectId
+    userId,
     'listing_created',
     'New Listing Added',
     `Your listing "${saved.title}" has been added!`,
     `/listing/${saved._id}`
   );
-} catch (err) { console.error('[Notification Error]', err); }
+} catch (err) { 
+  console.error('[Notification Error]', err); 
+}
 
-    res.status(201).json(saved);
+res.status(201).json(saved);
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -369,23 +374,23 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
     ].filter(Boolean);
     Promise.all(pathsToDelete.map(unlinkSafe)).catch(() => {});
 
-// ✅ Send notification if price or title changed
+// ✅ Send notification only if rent changed
 if (doc.price !== originalPrice || doc.title !== originalTitle) {
   try {
     console.log(`[Notification] Sending listing_updated for userId: ${userId}`);
     await sendNotification(
-      mongoose.Types.ObjectId(userId), // <-- convert to ObjectId
+      userId,
       'listing_updated',
       'Listing Updated',
       `Your listing "${doc.title}" has been updated!`,
       `/listing/${doc._id}`
     );
-  } catch (err) { console.error('[Notification Error]', err); }
+  } catch (err) { 
+    console.error('[Notification Error]', err); 
+  }
 }
 
-
-
-    res.json(updated);
+res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -397,7 +402,7 @@ if (doc.price !== originalPrice || doc.title !== originalTitle) {
 // --------------------------------------------------
 router.delete('/:id', async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = req.user._id;
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });

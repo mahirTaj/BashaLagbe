@@ -6,7 +6,7 @@ const { getIO } = require('../socket');
  * Send a notification to a user.
  * Saves it in the database and emits via Socket.io to the user's room.
  * 
- * @param {string} userId - The user ID to notify.
+ * @param {ObjectId} userId - The user ID to notify.
  * @param {string} type - Type of notification (message, listing_approval, rent_change, listing_created, listing_updated).
  * @param {string} title - Notification title.
  * @param {string} message - Notification message.
@@ -24,18 +24,18 @@ async function sendNotification(userId, type, title, message, url = '') {
   }
 
   try {
-    // 1️⃣ Save notification in the database
+    // 1️⃣ Save notification in DB
     const notif = new Notification({
-      userId,
+      userId,  // already an ObjectId (from req.user._id)
       type,
       title,
       message,
-      link: url,  // keep property name consistent with notifications model
+      link: url,
       isRead: false,
     });
     const saved = await notif.save();
 
-    // 2️⃣ Emit via Socket.io to the user's room
+    // 2️⃣ Emit via Socket.io
     try {
       const io = getIO();
       io.to(`user:${userId}`).emit('newNotification', saved);
@@ -51,3 +51,4 @@ async function sendNotification(userId, type, title, message, url = '') {
 }
 
 module.exports = { sendNotification };
+
