@@ -50,81 +50,87 @@ async function unlinkSafe(filePath) {
 }
 
 // Create listing (requires userId)
-router.post('/',   authMiddleware, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
-  try {
-    const userId = req.user._id;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+router.post(
+  '/',
+  authMiddleware,
+  upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]),
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      if (!userId) return res.status(400).json({ error: 'userId required' });
 
-    const base = `${req.protocol}://${req.get('host')}`;
-    const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-    const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
+      const base = `${req.protocol}://${req.get('host')}`;
+      const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
+      const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
 
-    // Basic required validations
-    const missing = [];
-    if (!req.body.title || !req.body.title.trim()) missing.push('title');
-    if (req.body.price === undefined || req.body.price === '') missing.push('price');
-    if (!req.body.type) missing.push('type');
-    if (!req.body.division) missing.push('division');
-    if (!req.body.district) missing.push('district');
-    if (!req.body.subdistrict) missing.push('subdistrict');
-    if (!req.body.area) missing.push('area');
-    if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
-    const floorNum = req.body.floor !== undefined ? Number(req.body.floor) : undefined;
-    if (floorNum === undefined || Number.isNaN(floorNum) || floorNum < 0) missing.push('floor');
-    if (!req.body.availableFrom) missing.push('availableFrom');
-    const roomsNum = req.body.rooms !== undefined ? Number(req.body.rooms) : undefined;
-    if (roomsNum === undefined || Number.isNaN(roomsNum) || roomsNum < 0) missing.push('rooms');
-    if (photoUrls.length === 0) missing.push('photos');
-    if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
+      // Validate required fields
+      const missing = [];
+      if (!req.body.title || !req.body.title.trim()) missing.push('title');
+      if (!req.body.price) missing.push('price');
+      if (!req.body.type) missing.push('type');
+      if (!req.body.division) missing.push('division');
+      if (!req.body.district) missing.push('district');
+      if (!req.body.subdistrict) missing.push('subdistrict');
+      if (!req.body.area) missing.push('area');
+      if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
+      if (!req.body.floor) missing.push('floor');
+      if (!req.body.rooms) missing.push('rooms');
+      if (!req.body.availableFrom) missing.push('availableFrom');
+      if (photoUrls.length === 0) missing.push('photos');
+      if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
 
-    const payload = {
-      ...req.body,
-      userId,
-      price: (() => { const n = Number(req.body.price); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-      rooms: Number(req.body.rooms),
-      bathrooms: req.body.bathrooms ? Number(req.body.bathrooms) : 0,
-      balcony: req.body.balcony ? Number(req.body.balcony) : 0,
-      personCount: req.body.personCount ? Number(req.body.personCount) : 1,
-      isRented: req.body.isRented === 'true' || req.body.isRented === true,
-      features: req.body.features ? req.body.features.split(',').map(s => s.trim()).filter(Boolean) : [],
-      floor: Number(req.body.floor),
-      totalFloors: req.body.totalFloors ? Number(req.body.totalFloors) : 0,
-      furnishing: req.body.furnishing || 'Unfurnished',
-      deposit: req.body.deposit ? Math.max(0, Number(req.body.deposit)) : 0,
-      serviceCharge: req.body.serviceCharge ? Math.max(0, Number(req.body.serviceCharge)) : 0,
-      negotiable: req.body.negotiable === 'true' || req.body.negotiable === true,
-      utilitiesIncluded: req.body.utilitiesIncluded ? req.body.utilitiesIncluded.split(',').map(s => s.trim()).filter(Boolean) : [],
-      contactName: req.body.contactName || '',
-      phone: req.body.phone || '',
-      availableFrom: new Date(req.body.availableFrom),
-      photoUrls,
-      videoUrl,
-      sizeSqft: req.body.sizeSqft ? Number(req.body.sizeSqft) : 0,
-    };
+      const payload = {
+        ...req.body,
+        userId,
+        price: Number(req.body.price) || 0,
+        rooms: Number(req.body.rooms),
+        bathrooms: Number(req.body.bathrooms) || 0,
+        balcony: Number(req.body.balcony) || 0,
+        personCount: Number(req.body.personCount) || 1,
+        isRented: req.body.isRented === 'true' || req.body.isRented === true,
+        features: req.body.features
+          ? req.body.features.split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
+        floor: Number(req.body.floor),
+        totalFloors: Number(req.body.totalFloors) || 0,
+        furnishing: req.body.furnishing || 'Unfurnished',
+        deposit: Math.max(0, Number(req.body.deposit) || 0),
+        serviceCharge: Math.max(0, Number(req.body.serviceCharge) || 0),
+        negotiable: req.body.negotiable === 'true' || req.body.negotiable === true,
+        utilitiesIncluded: req.body.utilitiesIncluded
+          ? req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
+        contactName: req.body.contactName || '',
+        phone: req.body.phone || '',
+        availableFrom: new Date(req.body.availableFrom),
+        photoUrls,
+        videoUrl,
+        sizeSqft: Number(req.body.sizeSqft) || 0,
+      };
 
-    const listing = new Listing(payload);
-const saved = await listing.save();
+      const listing = new Listing(payload);
+      const saved = await listing.save();
 
-// ✅ Send notification for new listing
-try {
-  console.log(`[Notification] Sending listing_created for userId: ${userId}`);
-  await sendNotification(
-    userId,
-    'listing_created',
-    'New Listing Added',
-    `Your listing "${saved.title}" has been added!`,
-    `/listing/${saved._id}`
-  );
-} catch (err) { 
-  console.error('[Notification Error]', err); 
-}
+      // ✅ Send notification for new listing
+      try {
+        console.log(`[Notification] Sending listing_created for userId: ${saved.userId}`);
+        await sendNotification(
+          saved.userId,
+          'listing_created',
+          'New Listing Added',
+          `Your listing "${saved.title}" has been added!`,
+          `/listing/${saved._id}`
+        );
+      } catch (err) {
+        console.error('[Notification Error]', err);
+      }
 
-res.status(201).json(saved);
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+      res.status(201).json(saved);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
-});
+);
 
 // --------------------------------------------------
 // Basic get (optionally restricted to user via header) - kept for existing UI
@@ -280,30 +286,31 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update listing (only by owner)
-// Update listing (only by owner)
 router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = req.user._id.toString(); // <-- convert ObjectId to string
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
+    // Find listing by ID AND owner
     const doc = await Listing.findOne({ _id: req.params.id, userId });
     if (!doc) return res.status(404).json({ error: 'Not found or not owner' });
 
     const originalPhotoUrls = Array.isArray(doc.photoUrls) ? [...doc.photoUrls] : [];
     const originalVideoUrl = doc.videoUrl || '';
-    const originalPrice = doc.price; // ✅ Save original price to compare later
+    const originalPrice = doc.price;
+    const originalTitle = doc.title;
 
     const base = `${req.protocol}://${req.get('host')}`;
     const newPhotoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
     const keep = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : doc.photoUrls;
 
-    // Update fields
+    // Update fields safely
     doc.title = req.body.title ?? doc.title;
     doc.description = req.body.description ?? doc.description;
     doc.type = req.body.type ?? doc.type;
     if (typeof req.body.price !== 'undefined') {
       const n = Number(req.body.price);
-      doc.price = Number.isFinite(n) && n > 0 ? n : 0;
+      doc.price = Number.isFinite(n) && n >= 0 ? n : doc.price;
     }
     if (req.body.availableFrom) doc.availableFrom = new Date(req.body.availableFrom);
     if (typeof req.body.rooms !== 'undefined') doc.rooms = Number(req.body.rooms);
@@ -313,109 +320,91 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
     if (typeof req.body.isRented !== 'undefined') doc.isRented = req.body.isRented === 'true' || req.body.isRented === true;
     if (req.body.features) doc.features = req.body.features.split(',').map((s) => s.trim()).filter(Boolean);
 
-    if (typeof req.body.division !== 'undefined') doc.division = req.body.division;
-    if (typeof req.body.district !== 'undefined') doc.district = req.body.district;
-    if (typeof req.body.subdistrict !== 'undefined') doc.subdistrict = req.body.subdistrict;
-    if (typeof req.body.area !== 'undefined') doc.area = req.body.area;
-    if (typeof req.body.road !== 'undefined') doc.road = req.body.road;
-    if (typeof req.body.houseNo !== 'undefined') doc.houseNo = req.body.houseNo;
-    if (typeof req.body.floor !== 'undefined') doc.floor = Number(req.body.floor);
-    if (typeof req.body.totalFloors !== 'undefined') doc.totalFloors = Number(req.body.totalFloors) || 0;
-    if (typeof req.body.furnishing !== 'undefined') doc.furnishing = req.body.furnishing;
-    if (typeof req.body.deposit !== 'undefined') doc.deposit = Math.max(0, Number(req.body.deposit)) || 0;
-    if (typeof req.body.serviceCharge !== 'undefined') doc.serviceCharge = Math.max(0, Number(req.body.serviceCharge)) || 0;
+    // Address & other fields
+    ['division', 'district', 'subdistrict', 'area', 'road', 'houseNo', 'furnishing', 'contactName', 'phone'].forEach(field => {
+      if (typeof req.body[field] !== 'undefined') doc[field] = req.body[field];
+    });
+    ['floor', 'totalFloors', 'deposit', 'serviceCharge', 'sizeSqft'].forEach(field => {
+      if (typeof req.body[field] !== 'undefined') doc[field] = Number(req.body[field]) || 0;
+    });
     if (typeof req.body.negotiable !== 'undefined') doc.negotiable = req.body.negotiable === 'true' || req.body.negotiable === true;
-    if (typeof req.body.utilitiesIncluded !== 'undefined') doc.utilitiesIncluded = req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean);
-    if (typeof req.body.contactName !== 'undefined') doc.contactName = req.body.contactName;
-    if (typeof req.body.phone !== 'undefined') doc.phone = req.body.phone;
-    if (typeof req.body.sizeSqft !== 'undefined') doc.sizeSqft = Number(req.body.sizeSqft) || 0;
+    if (typeof req.body.utilitiesIncluded !== 'undefined') doc.utilitiesIncluded = req.body.utilitiesIncluded.split(',').map(s => s.trim()).filter(Boolean);
 
+    // Media
     doc.photoUrls = [...keep, ...newPhotoUrls];
-    let removedVideoUrl = '';
-    if (req.files?.video?.[0]) {
-      removedVideoUrl = originalVideoUrl;
-      doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
-    } else if (req.body.removeVideo === 'true') {
-      removedVideoUrl = originalVideoUrl;
-      doc.videoUrl = '';
-    } else if (req.body.existingVideoUrl) {
-      doc.videoUrl = req.body.existingVideoUrl;
-    }
+    if (req.files?.video?.[0]) doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
+    else if (req.body.removeVideo === 'true') doc.videoUrl = '';
+    else if (req.body.existingVideoUrl) doc.videoUrl = req.body.existingVideoUrl;
 
     // Basic validation
-    const must = {
-      title: doc.title,
-      price: doc.price,
-      type: doc.type,
-      floor: doc.floor,
-      rooms: doc.rooms,
-      availableFrom: doc.availableFrom,
-      division: doc.division,
-      district: doc.district,
-      subdistrict: doc.subdistrict,
-      area: doc.area,
-      phone: doc.phone,
-    };
-    const missing = Object.entries(must).filter(([k, v]) => {
-      if (k === 'floor') return !(typeof v === 'number') || v < 0;
-      if (k === 'rooms') return !(typeof v === 'number') || v < 0;
+    const requiredFields = ['title', 'price', 'type', 'floor', 'rooms', 'availableFrom', 'division', 'district', 'subdistrict', 'area', 'phone'];
+    const missing = requiredFields.filter(f => {
+      const v = doc[f];
+      if (f === 'floor' || f === 'rooms') return !(typeof v === 'number') || v < 0;
       return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
-    }).map(([k]) => k);
+    });
     if (!doc.photoUrls.length) missing.push('photos');
     if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
 
     const updated = await doc.save();
 
-    // Delete removed files
-    const removedPhotos = originalPhotoUrls.filter((u) => !doc.photoUrls.includes(u));
-    const pathsToDelete = [
-      ...removedPhotos.map(urlToUploadPath),
-      urlToUploadPath(removedVideoUrl),
-    ].filter(Boolean);
-    Promise.all(pathsToDelete.map(unlinkSafe)).catch(() => {});
+    // Send notification if price or title changed
+    if (doc.price !== originalPrice || doc.title !== originalTitle) {
+      try {
+        console.log(`[Notification] Sending listing_updated for userId: ${doc.userId}`);
+        await sendNotification(
+          doc.userId,
+          'listing_updated',
+          'Listing Updated',
+          `Your listing "${doc.title}" has been updated!`,
+          `/listing/${doc._id}`
+        );
+      } catch (err) {
+        console.error('[Notification Error]', err);
+      }
+    }
 
-// ✅ Send notification only if rent changed
-if (doc.price !== originalPrice || doc.title !== originalTitle) {
-  try {
-    console.log(`[Notification] Sending listing_updated for userId: ${userId}`);
-    await sendNotification(
-      userId,
-      'listing_updated',
-      'Listing Updated',
-      `Your listing "${doc.title}" has been updated!`,
-      `/listing/${doc._id}`
-    );
-  } catch (err) { 
-    console.error('[Notification Error]', err); 
-  }
-}
-
-res.json(updated);
+    res.json({ _id: updated._id, message: 'Listing updated successfully', data: updated });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // --------------------------------------------------
 // Delete listing (owner only)
 // --------------------------------------------------
 router.delete('/:id', async (req, res) => {
   try {
-    const userId = req.user._id;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const userIdStr = req.user._id.toString(); // ✅ ensure string
+    if (!userIdStr) return res.status(400).json({ error: 'userId required' });
 
-    const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
+    // Find and delete listing owned by this user
+    const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId: userIdStr });
     if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });
 
+    // Delete associated files safely
     const fileUrls = [...(deleted.photoUrls || []), deleted.videoUrl || ''].filter(Boolean);
     const filePaths = fileUrls.map(urlToUploadPath).filter(Boolean);
     Promise.all(filePaths.map(unlinkSafe)).catch(() => {});
+
+    // ✅ Optionally send notification on deletion
+    try {
+      console.log(`[Notification] Sending listing_deleted for userId: ${deleted.userId}`);
+      await sendNotification(
+        deleted.userId,
+        'listing_deleted',
+        'Listing Deleted',
+        `Your listing "${deleted.title}" has been deleted.`,
+        `/listing/${deleted._id}`
+      );
+    } catch (err) {
+      console.error('[Notification Error]', err);
+    }
 
     res.json({ message: 'Listing deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 module.exports = router;
