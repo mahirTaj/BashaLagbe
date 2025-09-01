@@ -47,7 +47,7 @@ async function sendNotification(userId, type, title, message, url = '') {
     });
     const saved = await notif.save();
 
-    // ✅ Log success for demo users too
+    //  Log success for demo users too
     console.log(`[sendNotification] Notification saved for userId: ${userId}`);
 
     // 2️⃣ Emit via Socket.io to the user's room

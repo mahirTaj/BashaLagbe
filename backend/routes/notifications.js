@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 
 const router = express.Router();
 
-// ✅ Get all notifications for the logged-in user
+// Get all notifications for the logged-in user
 router.get('/', verifyToken, async (req, res) => {
   try {
     const userId = req.user._id;
@@ -24,7 +24,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// ✅ Mark a notification as read
+//  Mark a notification as read
 router.patch('/:id/read', verifyToken, async (req, res) => {
   try {
     const notifId = req.params.id;
@@ -44,7 +44,7 @@ router.patch('/:id/read', verifyToken, async (req, res) => {
   }
 });
 
-// ✅ Test route to trigger a notification
+//  Test route to trigger a notification
 router.post('/test', verifyToken, async (req, res) => {
   try {
     const { title, message, type, url } = req.body;
