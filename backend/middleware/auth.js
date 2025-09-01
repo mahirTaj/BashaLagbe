@@ -1,14 +1,14 @@
 // backend/middleware/auth.js
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose'); // ✅ Add mongoose for ObjectId
 
 function authMiddleware(req, res, next) {
   const authHeader = req.header('Authorization');
 
   // DEMO MODE: if no token but we want to run without login
   if (!authHeader && process.env.DEMO_MODE === 'true') {
-    // ✅ Use a fixed, valid ObjectId string instead of "demo-user"
-    req.user = { _id: new mongoose.Types.ObjectId("64fba8920dd5b95e5cce9f12") };
+    // ✅ Use a fixed string userId for demo
+    req.user = { _id: "user_a" };
+    console.log('[authMiddleware][DEMO] Using demo user "user_a"');
     return next();
   }
 
@@ -19,12 +19,13 @@ function authMiddleware(req, res, next) {
   const token = authHeader.replace('Bearer ', '');
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
-    // Normalize user object so _id is always available
-    req.user = { _id: decoded.id || decoded._id };
+    
+    // ✅ Always store as string for real users
+    const id = decoded.id || decoded._id || decoded.userId;
+    req.user = { _id: id ? String(id) : null };
 
-    // ✅ Ensure it's always an ObjectId instance
-    if (!mongoose.isValidObjectId(req.user._id)) {
-      req.user._id = new mongoose.Types.ObjectId(req.user._id);
+    if (!req.user._id) {
+      return res.status(401).json({ message: 'Invalid token payload: missing user ID' });
     }
 
     next();
@@ -33,5 +34,4 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// ✅ Export the function directly
 module.exports = authMiddleware;

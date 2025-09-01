@@ -17,19 +17,18 @@ const { getIO } = require('../socket');
 async function sendNotification(userId, type, title, message, url = '') {
   if (!userId) return;
 
-  // ✅ Ensure userId is a valid ObjectId
-  try {
+  let mongoUserId = userId;
+
+  // Only convert to ObjectId if it's not the demo user
+  if (userId !== 'user_a') {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       console.warn('[sendNotification] Invalid userId, skipping:', userId);
       return null;
     }
-    userId = new mongoose.Types.ObjectId(userId);
-  } catch (err) {
-    console.warn('[sendNotification] Failed to convert userId:', userId);
-    return null;
+    mongoUserId = new mongoose.Types.ObjectId(userId);
   }
 
-  // ✅ Ensure type is valid
+  // Ensure type is valid
   const validTypes = ['message', 'listing_approval', 'rent_change', 'listing_created', 'listing_updated'];
   if (!validTypes.includes(type)) {
     console.warn(`[sendNotification] Invalid type "${type}", defaulting to "message"`);
@@ -39,7 +38,7 @@ async function sendNotification(userId, type, title, message, url = '') {
   try {
     // 1️⃣ Save notification in DB
     const notif = new Notification({
-      userId,
+      userId: mongoUserId,
       type,
       title,
       message,
@@ -48,10 +47,13 @@ async function sendNotification(userId, type, title, message, url = '') {
     });
     const saved = await notif.save();
 
+    // ✅ Log success for demo users too
+    console.log(`[sendNotification] Notification saved for userId: ${userId}`);
+
     // 2️⃣ Emit via Socket.io to the user's room
     try {
       const io = getIO();
-      io.to(`user:${userId}`).emit('newNotification', saved);
+      io.to(`user:${userId}`).emit('newNotification', saved); // use original ID for socket room
     } catch (err) {
       console.warn('[sendNotification] Socket emit failed:', err.message);
     }

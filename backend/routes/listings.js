@@ -56,7 +56,7 @@ router.post(
   upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]),
   async (req, res) => {
     try {
-      const userId = req.user._id;
+      const userId = String(req.user._id);
       if (!userId) return res.status(400).json({ error: 'userId required' });
 
       const base = `${req.protocol}://${req.get('host')}`;
@@ -286,9 +286,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update listing (only by owner)
-router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+router.put('/:id',  authMiddleware,upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
-    const userId = req.user._id.toString(); // <-- convert ObjectId to string
+    const userId = String(req.user._id);// <-- convert ObjectId to string
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     // Find listing by ID AND owner
@@ -374,9 +374,9 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
 // --------------------------------------------------
 // Delete listing (owner only)
 // --------------------------------------------------
-router.delete('/:id', async (req, res) => {
+router.delete('/:id',authMiddleware, async (req, res) => {
   try {
-    const userIdStr = req.user._id.toString(); // ✅ ensure string
+    const userIdStr = String(req.user._id);// ✅ ensure string
     if (!userIdStr) return res.status(400).json({ error: 'userId required' });
 
     // Find and delete listing owned by this user
