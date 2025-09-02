@@ -10,7 +10,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import WishlistPage from './pages/Wishlist';
 import MessageInterfacePage from './pages/MessageInterface';
-import NotificationBell from './pages/NotificationsBell'; // Make sure this path is correct
+import NotificationBell from './pages/NotificationsBell';
+import { getToken } from './auth'; // Make sure this path is correct
 
 function Nav() {
   const { user, switchUser } = useAuth();
