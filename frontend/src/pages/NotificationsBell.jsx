@@ -1,4 +1,4 @@
-// src/pages/NotificationBell.jsx
+// src/pages/NotificationsBell.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import { getSocket } from '../socket';
 
@@ -8,7 +8,7 @@ export default function NotificationBell({ userId, token }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Fetch existing notifications on load
+  // Fetch existing notifications
   useEffect(() => {
     if (!userId || !token) return;
 
@@ -26,17 +26,26 @@ export default function NotificationBell({ userId, token }) {
   // Socket.io real-time updates
   useEffect(() => {
     if (!userId) return;
-    const socket = getSocket(userId); // pass userId into getSocket()
+    const socket = getSocket(userId);
 
-    // Match backend emit: 'newNotification'
-    socket.on('newNotification', (notif) => {
-      console.log('[socket] received notification:', notif);
+    socket.emit('join', `user:${userId}`);
+
+    const handleNotif = (notif) => {
+      console.log('[socket] notification received:', notif);
       setNotifications(prev => [notif, ...prev]);
       setUnreadCount(prev => prev + 1);
-    });
+    };
+
+    // ✅ Listen for both possible event names
+    socket.on('newNotification', handleNotif);
+    socket.on('listing_updated', handleNotif);
+
+    socket.on('connect', () => console.log('[socket] connected:', socket.id));
+    socket.on('disconnect', () => console.log('[socket] disconnected:', socket.id));
 
     return () => {
-      socket.off('newNotification');
+      socket.off('newNotification', handleNotif);
+      socket.off('listing_updated', handleNotif);
     };
   }, [userId, token]);
 
@@ -51,7 +60,6 @@ export default function NotificationBell({ userId, token }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Mark a notification as read
   const markAsRead = async (id) => {
     try {
       await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
@@ -103,13 +111,11 @@ export default function NotificationBell({ userId, token }) {
           zIndex: 10002
         }}>
           {notifications.length === 0 && (
-            <div style={{ padding: 12, textAlign: 'center', color: '#555' }}>
-              No notifications
-            </div>
+            <div style={{ padding: 12, textAlign: 'center', color: '#555' }}>No notifications</div>
           )}
           {notifications.map(n => (
             <div
-              key={n._id}
+              key={n._id || Math.random()} // fallback if backend didn’t send _id
               style={{
                 padding: 10,
                 borderBottom: '1px solid #eee',
@@ -117,15 +123,17 @@ export default function NotificationBell({ userId, token }) {
                 cursor: 'pointer'
               }}
               onClick={() => {
-                markAsRead(n._id);
+                if (n._id) markAsRead(n._id);
                 if (n.url) window.location.href = n.url;
               }}
             >
-              <strong>{n.title}</strong>
+              <strong>{n.title || 'Notification'}</strong>
               <div style={{ fontSize: '0.85rem', color: '#555' }}>{n.message}</div>
-              <div style={{ fontSize: '0.7rem', color: '#999' }}>
-                {new Date(n.createdAt).toLocaleString()}
-              </div>
+              {n.createdAt && (
+                <div style={{ fontSize: '0.7rem', color: '#999' }}>
+                  {new Date(n.createdAt).toLocaleString()}
+                </div>
+              )}
             </div>
           ))}
         </div>
