@@ -12,7 +12,7 @@ export default function MessageInterfacePage() {
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 📌 Load all threads initially
+  // 📌 Load threads
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -34,7 +34,7 @@ export default function MessageInterfacePage() {
     };
   }, [threadId, navigate]);
 
-  // 📌 Load active thread when threadId changes
+  // 📌 Load active thread
   useEffect(() => {
     let mounted = true;
     if (!threadId) return;
@@ -45,7 +45,6 @@ export default function MessageInterfacePage() {
         if (!mounted) return;
         setActive(data);
 
-        // ✅ Join the thread-specific room
         const socket = getSocket();
         socket.emit('thread:join', threadId);
       } catch (e) {
@@ -58,35 +57,30 @@ export default function MessageInterfacePage() {
     };
   }, [threadId]);
 
-  // 📌 Real-time updates when new messages arrive
+  // 📌 Real-time updates
   useEffect(() => {
     const socket = getSocket();
 
     const onNotify = ({ threadId: tid, preview }) => {
-      console.log('[socket] message:notify received:', tid, preview);
       setThreads((prev) => {
         const next = [...prev];
         const idx = next.findIndex((t) => String(t._id) === String(tid));
 
         if (idx >= 0) {
-          // Update existing thread
           next[idx] = {
             ...next[idx],
             lastMessage: preview,
             updatedAt: new Date().toISOString(),
           };
-          // Move it to the top
           const [item] = next.splice(idx, 1);
           next.unshift(item);
         } else {
-          // New thread just appeared
           next.unshift({
             _id: tid,
             lastMessage: preview,
             listing: null,
           });
         }
-
         return next;
       });
     };
@@ -104,7 +98,7 @@ export default function MessageInterfacePage() {
 
   return (
     <div className="flex h-[calc(100vh-80px)] border rounded-lg overflow-hidden bg-white">
-      {/* Sidebar with threads */}
+      {/* Sidebar */}
       <aside className="w-80 border-r overflow-y-auto">
         <div className="p-4 font-semibold text-gray-700">Conversations</div>
         <ul>
@@ -126,9 +120,7 @@ export default function MessageInterfacePage() {
             </li>
           ))}
           {threads.length === 0 && (
-            <li className="p-4 text-sm text-gray-500">
-              No conversations yet.
-            </li>
+            <li className="p-4 text-sm text-gray-500">No conversations yet.</li>
           )}
         </ul>
       </aside>

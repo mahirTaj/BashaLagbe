@@ -1,6 +1,6 @@
 // frontend/src/components/ui/ChatBox.jsx
 import React, { useEffect, useRef, useState } from 'react';
-import { sendMessage, fetchMessages } from '../../messages'; // ✅ added fetchMessages
+import { sendMessage, fetchMessages } from '../../messages';
 import { getSocket } from '../../socket';
 
 export default function ChatBox({ threadId, initialThread, initialMessages }) {
@@ -10,7 +10,7 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
   const bottomRef = useRef(null);
   const typingTimeout = useRef(null);
 
-  // ✅ NEW: fetch messages if threadId exists but no initialMessages
+  // ✅ Fetch messages if no initialMessages provided
   useEffect(() => {
     if (threadId && (!initialMessages || initialMessages.length === 0)) {
       (async () => {
@@ -24,19 +24,20 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
     }
   }, [threadId, initialMessages]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Reset messages when initialMessages change
   useEffect(() => {
     setMessages(initialMessages || []);
   }, [initialMessages]);
 
+  // Socket listeners
   useEffect(() => {
     const socket = getSocket();
 
-    // ✅ NEW: join the thread room for real-time updates
     if (threadId) {
       socket.emit('thread:join', { threadId });
     }
@@ -57,7 +58,6 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
     return () => {
       socket.off('message:new', onNewMessage);
       socket.off('typing', onTyping);
-      // ✅ leave room on unmount
       if (threadId) {
         socket.emit('thread:leave', { threadId });
       }
@@ -70,8 +70,7 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
     setInput('');
     try {
       const { message } = await sendMessage(threadId, text);
-      // Optimistic update in case socket echo is delayed
-      setMessages(prev => [...prev, message]);
+      setMessages(prev => [...prev, message]); // Optimistic update
     } catch (e) {
       console.error('sendMessage error:', e);
       alert('Failed to send message.');
@@ -136,8 +135,7 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
   );
 }
 
-// Simple helper that reads your user id from localStorage JWT (if you store it)
-// For demo safety, fallback to false if not available
+// ✅ helper: check if the message is from current user
 function isMine(senderId) {
   try {
     const token = localStorage.getItem('token');

@@ -3,27 +3,32 @@ import { useAuth } from '../auth';
 import { findOrCreateThread } from '../messages';
 import { useState } from 'react';
 
+// 🔑 helper: normalize ID as string
+function asString(v) {
+  return v ? String(v) : null;
+}
+
 export default function ContactLandlordButton({ landlordId, listingTitle, listingId }) {
   const navigate = useNavigate();
   const { user } = useAuth() || {};
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
+    const currentUserId = asString(user?._id || user?.id);
+
     // 🔹 Debug logs
     console.log('[ContactLandlordButton] user from useAuth():', user);
     console.log('[ContactLandlordButton] Props:', {
       landlordId,
       listingId,
       listingTitle,
-      currentUserId: user?._id || user?.id
+      currentUserId,
     });
 
-    // 🔹 Safe login check — works for both `_id` and `id`
-    if (!(user?._id || user?.id)) {
+    if (!currentUserId) {
       alert('Please log in to contact the landlord.');
       return;
     }
-
     if (!landlordId || !listingId) {
       alert('Missing landlord or listing info.');
       return;
@@ -31,22 +36,23 @@ export default function ContactLandlordButton({ landlordId, listingTitle, listin
 
     setLoading(true);
     try {
-      const { thread } = await findOrCreateThread({
-        listingId,
-        landlordId,
-        currentUserId: user._id || user.id
+      const thread = await findOrCreateThread({
+        listingId: asString(listingId),
+        landlordId: asString(landlordId),
+        currentUserId,
       });
 
+      // ✅ backend returns the thread object directly
       if (thread?._id) {
         navigate(`/messages/${thread._id}`);
       } else {
         navigate('/messages', {
           state: {
             listingId,
-            receiverId: landlordId,
+            receiverId: asString(landlordId),
             listingTitle,
-            currentUserId: user._id || user.id
-          }
+            currentUserId,
+          },
         });
       }
     } catch (err) {

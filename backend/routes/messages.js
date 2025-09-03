@@ -2,22 +2,28 @@
 const express = require('express');
 const router = express.Router();
 const { getIO } = require('../socket');
-const { Message, MessageThread } = require('../models/messages'); // ✅ fixed import
+const { Message, MessageThread } = require('../models/messages');
+
+// Helper: normalize any ObjectId/string → string
+const asString = (v) => (v ? String(v) : null);
 
 // 🆕 Find or create a thread
 router.post('/find-or-create', async (req, res) => {
   try {
     const { listingId, landlordId, currentUserId } = req.body;
 
+    const landlord = asString(landlordId);
+    const currentUser = asString(currentUserId);
+
     let thread = await MessageThread.findOne({
       listing: listingId,
-      participants: { $all: [landlordId, currentUserId] }
+      participants: { $all: [landlord, currentUser] },
     });
 
     if (!thread) {
       thread = new MessageThread({
         listing: listingId,
-        participants: [landlordId, currentUserId],
+        participants: [landlord, currentUser],
         lastMessage: '',
       });
       await thread.save();
@@ -25,7 +31,7 @@ router.post('/find-or-create', async (req, res) => {
 
     // Notify landlord so their sidebar updates
     const io = getIO();
-    io.to(`user:${landlordId}`).emit('message:notify', {
+    io.to(`user:${landlord}`).emit('message:notify', {
       threadId: thread._id,
       preview: 'New conversation started',
     });
@@ -41,11 +47,12 @@ router.post('/find-or-create', async (req, res) => {
 router.post('/start', async (req, res) => {
   try {
     const { listingId, otherUserId, initialText } = req.body;
-    const senderId = req.user?.id || req.user?._id;
+    const senderId = asString(req.user?.id || req.user?._id);
+    const otherUser = asString(otherUserId);
 
     const thread = new MessageThread({
       listing: listingId,
-      participants: [senderId, otherUserId],
+      participants: [senderId, otherUser],
       lastMessage: initialText,
     });
     await thread.save();
@@ -60,7 +67,7 @@ router.post('/start', async (req, res) => {
     const io = getIO();
 
     // 📌 notify sidebar preview
-    io.to(`user:${otherUserId}`).emit('message:notify', {
+    io.to(`user:${otherUser}`).emit('message:notify', {
       threadId: thread._id,
       preview: initialText,
     });
@@ -83,7 +90,7 @@ router.post('/:id/send', async (req, res) => {
   try {
     const threadId = req.params.id;
     const { text } = req.body;
-    const senderId = req.user?.id || req.user?._id;
+    const senderId = asString(req.user?.id || req.user?._id);
 
     const thread = await MessageThread.findById(threadId);
     if (!thread) return res.status(404).json({ error: 'Thread not found' });
@@ -104,8 +111,8 @@ router.post('/:id/send', async (req, res) => {
 
     // 📌 notify other participants’ sidebars
     thread.participants
-      .filter(p => String(p) !== String(senderId))
-      .forEach(userId => {
+      .filter((p) => asString(p) !== senderId)
+      .forEach((userId) => {
         io.to(`user:${userId}`).emit('message:notify', {
           threadId,
           preview: text,
