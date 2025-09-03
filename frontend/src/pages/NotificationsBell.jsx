@@ -8,17 +8,17 @@ export default function NotificationBell({ userId, token }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Fetch existing notifications
+  // Fetch existing notifications once
   useEffect(() => {
     if (!userId || !token) return;
 
     fetch('http://localhost:5000/api/notifications', {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         setNotifications(data);
-        setUnreadCount(data.filter(n => !n.isRead).length);
+        setUnreadCount(data.filter((n) => !n.isRead).length);
       })
       .catch(console.error);
   }, [userId, token]);
@@ -28,28 +28,21 @@ export default function NotificationBell({ userId, token }) {
     if (!userId) return;
     const socket = getSocket(userId);
 
-    socket.emit('join', `user:${userId}`);
-
     const handleNotif = (notif) => {
       console.log('[socket] notification received:', notif);
-      setNotifications(prev => [notif, ...prev]);
-      setUnreadCount(prev => prev + 1);
+      setNotifications((prev) => [notif, ...prev]);
+      setUnreadCount((prev) => prev + 1);
     };
 
-    // ✅ Listen for both possible event names
+    // ✅ Listen only to the unified event name from backend
     socket.on('newNotification', handleNotif);
-    socket.on('listing_updated', handleNotif);
-
-    socket.on('connect', () => console.log('[socket] connected:', socket.id));
-    socket.on('disconnect', () => console.log('[socket] disconnected:', socket.id));
 
     return () => {
       socket.off('newNotification', handleNotif);
-      socket.off('listing_updated', handleNotif);
     };
-  }, [userId, token]);
+  }, [userId]);
 
-  // Handle click outside dropdown to close
+  // Handle click outside dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -64,10 +57,12 @@ export default function NotificationBell({ userId, token }) {
     try {
       await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error(err);
     }
@@ -81,46 +76,52 @@ export default function NotificationBell({ userId, token }) {
       >
         🔔
         {unreadCount > 0 && (
-          <span style={{
-            position: 'absolute',
-            top: -5,
-            right: -5,
-            background: 'red',
-            color: 'white',
-            borderRadius: '50%',
-            padding: '2px 6px',
-            fontSize: '0.7rem',
-            zIndex: 10001
-          }}>
+          <span
+            style={{
+              position: 'absolute',
+              top: -5,
+              right: -5,
+              background: 'red',
+              color: 'white',
+              borderRadius: '50%',
+              padding: '2px 6px',
+              fontSize: '0.7rem',
+              zIndex: 10001,
+            }}
+          >
             {unreadCount}
           </span>
         )}
       </div>
 
       {open && (
-        <div style={{
-          position: 'absolute',
-          right: 0,
-          marginTop: 8,
-          width: 300,
-          maxHeight: 400,
-          overflowY: 'auto',
-          background: 'white',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          borderRadius: 8,
-          zIndex: 10002
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            marginTop: 8,
+            width: 300,
+            maxHeight: 400,
+            overflowY: 'auto',
+            background: 'white',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            borderRadius: 8,
+            zIndex: 10002,
+          }}
+        >
           {notifications.length === 0 && (
-            <div style={{ padding: 12, textAlign: 'center', color: '#555' }}>No notifications</div>
+            <div style={{ padding: 12, textAlign: 'center', color: '#555' }}>
+              No notifications
+            </div>
           )}
-          {notifications.map(n => (
+          {notifications.map((n) => (
             <div
-              key={n._id || Math.random()} // fallback if backend didn’t send _id
+              key={n._id || Math.random()}
               style={{
                 padding: 10,
                 borderBottom: '1px solid #eee',
                 backgroundColor: n.isRead ? 'white' : '#f0f8ff',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
               onClick={() => {
                 if (n._id) markAsRead(n._id);
@@ -128,7 +129,9 @@ export default function NotificationBell({ userId, token }) {
               }}
             >
               <strong>{n.title || 'Notification'}</strong>
-              <div style={{ fontSize: '0.85rem', color: '#555' }}>{n.message}</div>
+              <div style={{ fontSize: '0.85rem', color: '#555' }}>
+                {n.message}
+              </div>
               {n.createdAt && (
                 <div style={{ fontSize: '0.7rem', color: '#999' }}>
                   {new Date(n.createdAt).toLocaleString()}

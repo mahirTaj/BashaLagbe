@@ -2,22 +2,20 @@
 const express = require('express');
 const router = express.Router();
 const { getIO } = require('../socket');
-const Message = require('../models/messages');
-const Thread = require('../models/thread');
+const { Message, MessageThread } = require('../models/messages'); // ✅ fixed import
 
 // 🆕 Find or create a thread
 router.post('/find-or-create', async (req, res) => {
   try {
     const { listingId, landlordId, currentUserId } = req.body;
 
-    let thread = await Thread.findOne({
+    let thread = await MessageThread.findOne({
       listing: listingId,
       participants: { $all: [landlordId, currentUserId] }
     });
 
-    // Create new if none exists
     if (!thread) {
-      thread = new Thread({
+      thread = new MessageThread({
         listing: listingId,
         participants: [landlordId, currentUserId],
         lastMessage: '',
@@ -43,17 +41,15 @@ router.post('/find-or-create', async (req, res) => {
 router.post('/start', async (req, res) => {
   try {
     const { listingId, otherUserId, initialText } = req.body;
-    const senderId = req.user.id || req.user._id;
+    const senderId = req.user?.id || req.user?._id;
 
-    // 1️⃣ Create thread
-    const thread = new Thread({
+    const thread = new MessageThread({
       listing: listingId,
       participants: [senderId, otherUserId],
       lastMessage: initialText,
     });
     await thread.save();
 
-    // 2️⃣ Save first message
     const message = new Message({
       thread: thread._id,
       sender: senderId,
@@ -61,11 +57,18 @@ router.post('/start', async (req, res) => {
     });
     const savedMessage = await message.save();
 
-    // 3️⃣ Notify the other participant
     const io = getIO();
+
+    // 📌 notify sidebar preview
     io.to(`user:${otherUserId}`).emit('message:notify', {
       threadId: thread._id,
       preview: initialText,
+    });
+
+    // 📌 deliver actual new message in the thread
+    io.to(`thread:${thread._id}`).emit('message:new', {
+      threadId: thread._id,
+      message: savedMessage,
     });
 
     res.json({ thread, firstMessage: savedMessage });
@@ -74,3 +77,52 @@ router.post('/start', async (req, res) => {
     res.status(500).json({ error: 'Failed to start thread' });
   }
 });
+
+// ✉️ Send a new message
+router.post('/:id/send', async (req, res) => {
+  try {
+    const threadId = req.params.id;
+    const { text } = req.body;
+    const senderId = req.user?.id || req.user?._id;
+
+    const thread = await MessageThread.findById(threadId);
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+
+    const message = new Message({
+      thread: threadId,
+      sender: senderId,
+      text,
+    });
+    const savedMessage = await message.save();
+
+    // Update thread preview
+    thread.lastMessage = text;
+    thread.updatedAt = new Date();
+    await thread.save();
+
+    const io = getIO();
+
+    // 📌 notify other participants’ sidebars
+    thread.participants
+      .filter(p => String(p) !== String(senderId))
+      .forEach(userId => {
+        io.to(`user:${userId}`).emit('message:notify', {
+          threadId,
+          preview: text,
+        });
+      });
+
+    // 📌 deliver to everyone in the thread room (active chat boxes)
+    io.to(`thread:${threadId}`).emit('message:new', {
+      threadId,
+      message: savedMessage,
+    });
+
+    res.json(savedMessage);
+  } catch (err) {
+    console.error('send message error:', err.message);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+module.exports = router;

@@ -13,31 +13,31 @@ function initSocketIO(server, options = {}) {
   io.on('connection', (socket) => {
     console.log('[socket] connected:', socket.id);
 
-    // ✅ User room (for notifications)
+    // ✅ Get userId from query directly
     const { userId } = socket.handshake.query;
     if (userId) {
       socket.join(`user:${userId}`);
-      console.log(`[socket] User ${userId} joined their room (via query)`);
+      console.log(`[socket] User ${userId} joined their room`);
     }
 
-    // ✅ Manual room join (generic)
-    socket.on('join', (room) => {
-      console.log(`[socket] joining room via event: ${room}`);
-      socket.join(room);
-    });
-
-    // ✅ Thread join for messaging
-    socket.on('thread:join', (threadId) => {
+    // 🧵 Join a specific thread room
+    socket.on('thread:join', ({ threadId }) => {
       if (!threadId) return;
       socket.join(`thread:${threadId}`);
-      console.log(`[socket] joined thread room: thread:${threadId}`);
+      console.log(`[socket] ${socket.id} joined thread:${threadId}`);
     });
 
-    // ✅ Thread leave for messaging
-    socket.on('thread:leave', (threadId) => {
+    // 🧵 Leave a specific thread room
+    socket.on('thread:leave', ({ threadId }) => {
       if (!threadId) return;
       socket.leave(`thread:${threadId}`);
-      console.log(`[socket] left thread room: thread:${threadId}`);
+      console.log(`[socket] ${socket.id} left thread:${threadId}`);
+    });
+
+    // ✍️ Typing indicator
+    socket.on('typing', ({ threadId, isTyping }) => {
+      if (!threadId) return;
+      socket.to(`thread:${threadId}`).emit('typing', { threadId, isTyping });
     });
 
     socket.on('disconnect', () => {
