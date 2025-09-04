@@ -1,19 +1,30 @@
 // backend/routes/messages.js
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { getIO } = require('../socket');
 const { Message, MessageThread } = require('../models/messages');
 
-// Helper: normalize any ObjectId/string → string
-const asString = (v) => (v ? String(v) : null);
+// Helper: normalize any ObjectId/string → ObjectId
+const toObjectId = (v) => {
+  try {
+    return v ? new mongoose.Types.ObjectId(v) : null;
+  } catch {
+    return null;
+  }
+};
 
 // 🆕 Find or create a thread
 router.post('/find-or-create', async (req, res) => {
   try {
     const { listingId, landlordId, currentUserId } = req.body;
 
-    const landlord = asString(landlordId);
-    const currentUser = asString(currentUserId);
+    const landlord = toObjectId(landlordId);
+    const currentUser = toObjectId(currentUserId);
+
+    if (!landlord || !currentUser) {
+      return res.status(400).json({ error: 'Invalid user IDs' });
+    }
 
     let thread = await MessageThread.findOne({
       listing: listingId,
@@ -31,7 +42,7 @@ router.post('/find-or-create', async (req, res) => {
 
     // Notify landlord so their sidebar updates
     const io = getIO();
-    io.to(`user:${landlord}`).emit('message:notify', {
+    io.to(`user:${String(landlord)}`).emit('message:notify', {
       threadId: thread._id,
       preview: 'New conversation started',
     });
@@ -47,8 +58,12 @@ router.post('/find-or-create', async (req, res) => {
 router.post('/start', async (req, res) => {
   try {
     const { listingId, otherUserId, initialText } = req.body;
-    const senderId = asString(req.user?.id || req.user?._id);
-    const otherUser = asString(otherUserId);
+    const senderId = toObjectId(req.user?.id || req.user?._id);
+    const otherUser = toObjectId(otherUserId);
+
+    if (!senderId || !otherUser) {
+      return res.status(400).json({ error: 'Invalid user IDs' });
+    }
 
     const thread = new MessageThread({
       listing: listingId,
@@ -67,7 +82,7 @@ router.post('/start', async (req, res) => {
     const io = getIO();
 
     // 📌 notify sidebar preview
-    io.to(`user:${otherUser}`).emit('message:notify', {
+    io.to(`user:${String(otherUser)}`).emit('message:notify', {
       threadId: thread._id,
       preview: initialText,
     });
@@ -88,9 +103,13 @@ router.post('/start', async (req, res) => {
 // ✉️ Send a new message
 router.post('/:id/send', async (req, res) => {
   try {
-    const threadId = req.params.id;
+    const threadId = toObjectId(req.params.id);
     const { text } = req.body;
-    const senderId = asString(req.user?.id || req.user?._id);
+    const senderId = toObjectId(req.user?.id || req.user?._id);
+
+    if (!threadId || !senderId) {
+      return res.status(400).json({ error: 'Invalid thread or sender ID' });
+    }
 
     const thread = await MessageThread.findById(threadId);
     if (!thread) return res.status(404).json({ error: 'Thread not found' });
@@ -111,9 +130,9 @@ router.post('/:id/send', async (req, res) => {
 
     // 📌 notify other participants’ sidebars
     thread.participants
-      .filter((p) => asString(p) !== senderId)
+      .filter((p) => String(p) !== String(senderId))
       .forEach((userId) => {
-        io.to(`user:${userId}`).emit('message:notify', {
+        io.to(`user:${String(userId)}`).emit('message:notify', {
           threadId,
           preview: text,
         });

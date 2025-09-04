@@ -5,7 +5,9 @@ import { useState } from 'react';
 
 // 🔑 helper: normalize ID as string
 function asString(v) {
-  return v ? String(v) : null;
+  if (!v) return null;
+  if (typeof v === 'object' && v._id) return String(v._id); // handle object { _id, name }
+  return String(v);
 }
 
 export default function ContactLandlordButton({ landlordId, listingTitle, listingId }) {

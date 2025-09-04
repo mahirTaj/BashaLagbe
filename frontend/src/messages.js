@@ -6,9 +6,11 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// 🔑 helper to ensure IDs are always strings
+// 🔑 helper: normalize ID as string
 function asString(v) {
-  return v ? String(v) : null;
+  if (!v) return null;
+  if (typeof v === 'object' && v._id) return String(v._id); // handle { _id, name }
+  return String(v);
 }
 
 export async function startThread({ listingId, otherUserId, initialText }) {
@@ -16,7 +18,7 @@ export async function startThread({ listingId, otherUserId, initialText }) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({
-      listingId,
+      listingId: asString(listingId),
       otherUserId: asString(otherUserId),
       initialText,
     }),
@@ -51,7 +53,7 @@ export async function sendMessage(threadId, text) {
   return res.json();
 }
 
-/* ✅ NEW: fetch all messages for a thread (used by ChatBox if no initialMessages) */
+/* ✅ Fetch all messages for a thread (used by ChatBox if no initialMessages) */
 export async function fetchMessages(threadId) {
   const res = await fetch(`${API_URL}/api/messages/${asString(threadId)}`, {
     headers: { ...authHeaders() },
@@ -60,13 +62,13 @@ export async function fetchMessages(threadId) {
   return res.json();
 }
 
-/* ✅ NEW: find existing thread or create one (used by ContactLandlordButton) */
+/* ✅ Find existing thread or create one (used by ContactLandlordButton) */
 export async function findOrCreateThread({ listingId, landlordId, currentUserId }) {
   const res = await fetch(`${API_URL}/api/messages/find-or-create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({
-      listingId,
+      listingId: asString(listingId),
       landlordId: asString(landlordId),
       currentUserId: asString(currentUserId),
     }),

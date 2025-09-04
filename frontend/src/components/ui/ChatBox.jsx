@@ -1,9 +1,10 @@
-// frontend/src/components/ui/ChatBox.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { sendMessage, fetchMessages } from '../../messages';
 import { getSocket } from '../../socket';
+import { useAuth } from '../../auth'; // ✅ use user from context
 
 export default function ChatBox({ threadId, initialThread, initialMessages }) {
+  const { user } = useAuth() || {};
   const [messages, setMessages] = useState(initialMessages || []);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -69,8 +70,9 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
     if (!text) return;
     setInput('');
     try {
-      const { message } = await sendMessage(threadId, text);
-      setMessages(prev => [...prev, message]); // Optimistic update
+      // ✅ backend returns the savedMessage directly
+      const savedMessage = await sendMessage(threadId, text);
+      setMessages(prev => [...prev, savedMessage]); // Optimistic update
     } catch (e) {
       console.error('sendMessage error:', e);
       alert('Failed to send message.');
@@ -101,7 +103,7 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
           <div
             key={m._id}
             className={`max-w-[70%] p-2 rounded-lg ${
-              isMine(m.sender) ? 'ml-auto bg-indigo-600 text-white' : 'bg-white border'
+              isMine(m.sender, user) ? 'ml-auto bg-indigo-600 text-white' : 'bg-white border'
             }`}
           >
             <div className="text-sm whitespace-pre-wrap">{m.text}</div>
@@ -135,15 +137,9 @@ export default function ChatBox({ threadId, initialThread, initialMessages }) {
   );
 }
 
-// ✅ helper: check if the message is from current user
-function isMine(senderId) {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return false;
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const myId = payload.id || payload._id;
-    return String(senderId) === String(myId);
-  } catch {
-    return false;
-  }
+// ✅ Works with both JWT payload IDs and demo user IDs from useAuth()
+function isMine(senderId, user) {
+  if (!user) return false;
+  const myId = user._id || user.id;
+  return String(senderId) === String(myId);
 }
