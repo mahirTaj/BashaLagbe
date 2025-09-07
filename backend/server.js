@@ -10,8 +10,12 @@ const session = require('express-session');
 const passport = require('./config/passport');  // Import passport config
 
 const listingsRoute = require('./routes/listings');
-const authRoutes = require('./routes/auth');
-const moveinRoutes = require('./routes/movein');
+let authRoutes = null;
+let moveinRoutes = null;
+let adminRoute = null;
+try { authRoutes = require('./routes/auth'); } catch (e) { /* optional */ }
+try { moveinRoutes = require('./routes/movein'); } catch (e) { /* optional */ }
+try { adminRoute = require('./routes/admin'); } catch (e) { /* optional */ }
 
 const app = express();
 
@@ -43,8 +47,9 @@ app.use('/uploads', express.static(uploadsPath));
 
 // Listings routes
 app.use('/api/listings', listingsRoute);
-// Move-in scheduling routes
-app.use('/api/movein', moveinRoutes);
+if (moveinRoutes) app.use('/api/movein', moveinRoutes);
+if (authRoutes) app.use('/api/auth', authRoutes);
+if (adminRoute) app.use('/api/admin', adminRoute);
 
 // Load cron jobs (reminders)
 try { require('./cron/reminder'); } catch (e) { /* ignore if not present */ }

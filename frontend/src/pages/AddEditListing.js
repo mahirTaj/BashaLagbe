@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../auth';
 import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
 import { Box, Paper, Grid, TextField, Select, MenuItem, FormControl, InputLabel, Button, Typography, Checkbox, FormControlLabel, Chip, Stack, Tabs, Tab } from '@mui/material';
+import MapPicker from '../components/MapPicker';
 
 const empty = {
   title: '',
@@ -17,6 +18,8 @@ const empty = {
   personCount: '',
   features: '', // comma separated in UI
   isRented: false,
+  lat: '',
+  lng: '',
 };
 
 export default function AddEditListing() {
@@ -41,6 +44,7 @@ export default function AddEditListing() {
   const [removeVideo, setRemoveVideo] = useState(false);
   const maxPhotos = 12;
   const [tab, setTab] = useState(0);
+  const [showPicker, setShowPicker] = useState(false);
 
   const keepCount = useMemo(
     () => existingPhotos.filter((u) => keepPhoto[u]).length,
@@ -101,6 +105,8 @@ export default function AddEditListing() {
           // Contact
           contactName: data.contactName || '',
           phone: data.phone || '',
+          lat: typeof data.lat === 'number' ? String(data.lat) : '',
+          lng: typeof data.lng === 'number' ? String(data.lng) : '',
         });
         setExistingPhotos(data.photoUrls || []);
         setKeepPhoto(Object.fromEntries((data.photoUrls || []).map((u) => [u, true])));
@@ -131,6 +137,18 @@ export default function AddEditListing() {
     if (name === 'price') {
       const n = Number(value);
       return setForm(f => ({ ...f, price: Number.isNaN(n) ? '' : Math.max(0, n) }));
+    }
+    if (name === 'lat' || name === 'lng') {
+      if (value === '') return setForm(f => ({ ...f, [name]: '' }));
+      const n = Number(value);
+      if (!Number.isFinite(n)) return; // ignore invalid
+      if (name === 'lat') {
+        const clamped = Math.max(20.5, Math.min(26.7, n));
+        return setForm(f => ({ ...f, lat: String(clamped) }));
+      } else {
+        const clamped = Math.max(88.0, Math.min(92.7, n));
+        return setForm(f => ({ ...f, lng: String(clamped) }));
+      }
     }
     setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
   };
@@ -237,7 +255,9 @@ export default function AddEditListing() {
         utilitiesIncluded: form.utilitiesIncluded || '',
   sizeSqft: String(Number(form.sizeSqft || 0)),
         contactName: form.contactName || '',
-        phone: form.phone || '',
+  phone: form.phone || '',
+  lat: form.lat || '',
+  lng: form.lng || '',
       };
       Object.entries(baseFields).forEach(([k, v]) => fd.append(k, v));
 
@@ -265,11 +285,12 @@ export default function AddEditListing() {
     fd.append('existingVideoUrl', videoUrl);
   }
 
-  // Require authentication
-  if (!user) return navigate('/login');
-  if (id) await axios.put(`/api/listings/${id}`, fd);
-  else await axios.post('/api/listings', fd);
-      navigate('/');
+    // Require authentication and rely on AuthProvider axios header (JWT)
+    if (!user) return navigate('/login');
+    if (id) await axios.put(`/api/listings/${id}`, fd);
+    else await axios.post('/api/listings', fd);
+    // After save, go to listings overview
+    navigate('/');
     } catch (e) {
       const status = e?.response?.status;
       const data = e?.response?.data;
@@ -412,6 +433,37 @@ export default function AddEditListing() {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField label="House No" name="houseNo" value={form.houseNo || ''} onChange={onChange} fullWidth />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Latitude (Bangladesh)" name="lat" inputProps={{ step: 'any', min: 20.5, max: 26.7 }} value={form.lat} onChange={onChange} fullWidth helperText="Optional, for map marker" />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Longitude (Bangladesh)" name="lng" inputProps={{ step: 'any', min: 88.0, max: 92.7 }} value={form.lng} onChange={onChange} fullWidth helperText="Optional, for map marker" />
+            </Grid>
+            <Grid item xs={12}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Button variant="outlined" size="small" onClick={() => setShowPicker(s => !s)}>
+                  {showPicker ? 'Hide map picker' : 'Pick on map'}
+                </Button>
+                <Typography variant="body2" color="text.secondary">
+                  You can type coordinates or click "Pick on map" and drop a marker.
+                </Typography>
+              </div>
+            </Grid>
+            {showPicker && (
+              <Grid item xs={12}>
+                <MapPicker
+                  lat={form.lat === '' ? undefined : Number(form.lat)}
+                  lng={form.lng === '' ? undefined : Number(form.lng)}
+                  onChange={({ lat, lng }) => setForm(f => ({ ...f, lat: lat === '' ? '' : String(lat), lng: lng === '' ? '' : String(lng) }))}
+                />
+              </Grid>
+            )}
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Latitude (Bangladesh)" name="lat" inputProps={{ step: 'any', min: 20.5, max: 26.7 }} value={form.lat} onChange={onChange} fullWidth helperText="Optional, for map marker" />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField type="number" label="Longitude (Bangladesh)" name="lng" inputProps={{ step: 'any', min: 88.0, max: 92.7 }} value={form.lng} onChange={onChange} fullWidth helperText="Optional, for map marker" />
             </Grid>
           </Grid>
         )}

@@ -37,6 +37,14 @@ const ListingSchema = new mongoose.Schema(
   furnishing: { type: String, enum: ['Unfurnished', 'Semi-furnished', 'Furnished'], default: 'Unfurnished' },
   sizeSqft: { type: Number, default: 0 },
 
+    // Geo (optional lat/lng and GeoJSON point for map)
+    lat: { type: Number },
+    lng: { type: Number },
+    location: {
+      type: { type: String, enum: ['Point'] },
+      coordinates: { type: [Number] }, // [lng, lat]
+    },
+
     // Media (store URLs for now; file uploads can map to URLs later)
     photoUrls: { type: [String], default: [] },
     videoUrl: { type: String, default: '' },
@@ -69,6 +77,13 @@ try {
   });
 } catch (e) {
   // index may already exist; ignore runtime errors during hot reload
+}
+
+// 2dsphere index for geospatial queries on map
+try {
+  ListingSchema.index({ location: '2dsphere' });
+} catch (e) {
+  // ignore if duplicate during dev
 }
 
 module.exports = mongoose.model('Listing', ListingSchema);
