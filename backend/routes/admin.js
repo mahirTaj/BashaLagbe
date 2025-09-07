@@ -850,4 +850,44 @@ router.get('/analytics/areas', adminAuth, async (req, res) => {
   }
 });
 
+// Dashboard statistics endpoint
+router.get('/dashboard/stats', adminAuth, async (req, res) => {
+  try {
+    const Listing = require('../models/listings');
+    const User = require('../models/User');
+    const Report = require('../models/Report');
+
+    // Get total properties from actual listings (not scraped data)
+    const totalProperties = await Listing.countDocuments();
+
+    // Get active users count
+    const activeUsers = await User.countDocuments();
+
+    // Get recent listings (last 30 days) as "pending approvals"
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const pendingApprovals = await Listing.countDocuments({ 
+      createdAt: { $gte: thirtyDaysAgo }
+    });
+
+    // Get open reports count (pending or under review)
+    const openReports = await Report.countDocuments({
+      status: { $in: ['pending', 'under_review'] }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalProperties,
+        activeUsers,
+        pendingApprovals,
+        openReports
+      }
+    });
+  } catch (err) {
+    console.error('Dashboard stats error', err);
+    res.status(500).json({ error: 'Failed to fetch dashboard statistics' });
+  }
+});
+
 module.exports = router;
