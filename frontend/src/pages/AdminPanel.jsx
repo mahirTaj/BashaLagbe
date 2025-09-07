@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../context/AdminAuthContext';
+import axios from 'axios';
 import {
   Box,
   Typography,
@@ -11,7 +12,8 @@ import {
   IconButton,
   Avatar,
   Chip,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import {
   Dashboard,
@@ -30,13 +32,40 @@ import {
 const AdminPanel = () => {
   const navigate = useNavigate();
   const { adminLogout } = useAdminAuth();
+  const [stats, setStats] = useState({
+    totalProperties: 0,
+    activeUsers: 0,
+    pendingApprovals: 0,
+    openReports: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/admin/dashboard/stats', {
+        headers: { 'admin-token': 'superadmin-token' }
+      });
+      if (response.data.success) {
+        setStats(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const adminCards = [
     {
       title: 'Review Reports',
       description: 'Review and moderate reported listings and users',
       icon: <Report sx={{ fontSize: 40, color: '#ff6b6b' }} />,
-      count: 'No reports',
+      count: loading ? '...' : `${stats.openReports} reports`,
       color: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
       action: 'Review Now',
       path: '/admin-panel/reports'
@@ -45,7 +74,7 @@ const AdminPanel = () => {
       title: 'Verify Listings',
       description: 'Approve or reject new property submissions',
       icon: <VerifiedUser sx={{ fontSize: 40, color: '#4ecdc4' }} />,
-      count: 'No pending',
+      count: loading ? '...' : `${stats.pendingApprovals} recent`,
       color: 'linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)',
       action: 'Verify Now',
       path: '/admin-panel/verify'
@@ -153,28 +182,36 @@ const AdminPanel = () => {
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <TrendingUp sx={{ fontSize: 40, color: '#4caf50', mb: 1 }} />
-            <Typography variant="h4" fontWeight={700} color="#4caf50">-</Typography>
+            <Typography variant="h4" fontWeight={700} color="#4caf50">
+              {loading ? <CircularProgress size={24} /> : stats.totalProperties}
+            </Typography>
             <Typography variant="body2" color="text.secondary">Total Properties</Typography>
           </Paper>
         </Grid>
-  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <People sx={{ fontSize: 40, color: '#2196f3', mb: 1 }} />
-            <Typography variant="h4" fontWeight={700} color="#2196f3">-</Typography>
+            <Typography variant="h4" fontWeight={700} color="#2196f3">
+              {loading ? <CircularProgress size={24} /> : stats.activeUsers}
+            </Typography>
             <Typography variant="body2" color="text.secondary">Active Users</Typography>
           </Paper>
         </Grid>
-  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <Home sx={{ fontSize: 40, color: '#ff9800', mb: 1 }} />
-            <Typography variant="h4" fontWeight={700} color="#ff9800">-</Typography>
+            <Typography variant="h4" fontWeight={700} color="#ff9800">
+              {loading ? <CircularProgress size={24} /> : stats.pendingApprovals}
+            </Typography>
             <Typography variant="body2" color="text.secondary">Pending Approvals</Typography>
           </Paper>
         </Grid>
-  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <Report sx={{ fontSize: 40, color: '#f44336', mb: 1 }} />
-            <Typography variant="h4" fontWeight={700} color="#f44336">-</Typography>
+            <Typography variant="h4" fontWeight={700} color="#f44336">
+              {loading ? <CircularProgress size={24} /> : stats.openReports}
+            </Typography>
             <Typography variant="body2" color="text.secondary">Open Reports</Typography>
           </Paper>
         </Grid>
