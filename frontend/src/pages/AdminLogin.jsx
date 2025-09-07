@@ -39,12 +39,15 @@ const AdminLogin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    const success = adminLogin(username, password);
-    if (success) {
-      navigate('/admin-panel');
-    } else {
-      setError('Invalid credentials');
+    try {
+      const success = await adminLogin(username, password);
+      if (success) {
+        navigate('/admin-panel');
+      } else {
+        setError('Invalid credentials');
+      }
+    } catch (e) {
+      setError('Login failed');
     }
   };
 
@@ -108,6 +111,7 @@ const AdminLogin = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
+              autoComplete="username"
               sx={{ mb: 3 }}
               InputProps={{
                 startAdornment: (
@@ -137,6 +141,7 @@ const AdminLogin = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               sx={{ mb: 3 }}
               InputProps={{
                 startAdornment: (

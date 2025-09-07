@@ -150,28 +150,28 @@ const AdminPanel = () => {
 
       {/* Quick Stats */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <TrendingUp sx={{ fontSize: 40, color: '#4caf50', mb: 1 }} />
             <Typography variant="h4" fontWeight={700} color="#4caf50">-</Typography>
             <Typography variant="body2" color="text.secondary">Total Properties</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <People sx={{ fontSize: 40, color: '#2196f3', mb: 1 }} />
             <Typography variant="h4" fontWeight={700} color="#2196f3">-</Typography>
             <Typography variant="body2" color="text.secondary">Active Users</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <Home sx={{ fontSize: 40, color: '#ff9800', mb: 1 }} />
             <Typography variant="h4" fontWeight={700} color="#ff9800">-</Typography>
             <Typography variant="body2" color="text.secondary">Pending Approvals</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3 }}>
             <Report sx={{ fontSize: 40, color: '#f44336', mb: 1 }} />
             <Typography variant="h4" fontWeight={700} color="#f44336">-</Typography>
@@ -181,9 +181,9 @@ const AdminPanel = () => {
       </Grid>
 
       {/* Admin Action Cards */}
-      <Grid container spacing={3}>
+    <Grid container spacing={3}>
         {adminCards.map((card, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
+      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
             <Card 
               elevation={6}
               sx={{ 

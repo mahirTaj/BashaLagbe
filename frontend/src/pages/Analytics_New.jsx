@@ -234,7 +234,7 @@ const Analytics = () => {
                 subtitle="Scraped samples"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Rent"
                 value={`৳${overallStats.avgRent.toLocaleString()}`}
@@ -243,7 +243,7 @@ const Analytics = () => {
                 subtitle="Per month"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Districts Covered"
                 value={overallStats.uniqueDistricts}
@@ -252,7 +252,7 @@ const Analytics = () => {
                 subtitle={`${overallStats.uniqueAreas} areas`}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Price Range"
                 value={`৳${Math.min(overallStats.minRent, overallStats.maxRent).toLocaleString()} - ৳${Math.max(overallStats.minRent, overallStats.maxRent).toLocaleString()}`}
@@ -265,7 +265,7 @@ const Analytics = () => {
 
           {/* Property Features Stats */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Bedrooms"
                 value={propertyFeatures.avgBedrooms || 'N/A'}
@@ -274,7 +274,7 @@ const Analytics = () => {
                 subtitle="Per property"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Bathrooms"
                 value={propertyFeatures.avgBathrooms || 'N/A'}
@@ -283,7 +283,7 @@ const Analytics = () => {
                 subtitle="Per property"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Rooms"
                 value={propertyFeatures.avgRooms || 'N/A'}
@@ -292,7 +292,7 @@ const Analytics = () => {
                 subtitle="Per property"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Data Quality"
                 value={`${((overallStats.totalProperties / (overallStats.totalProperties + 100)) * 100).toFixed(1)}%`}
@@ -472,7 +472,7 @@ const Analytics = () => {
               Analytics Filters
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>District</InputLabel>
                   <Select
@@ -489,7 +489,7 @@ const Analytics = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Area</InputLabel>
                   <Select
@@ -526,7 +526,7 @@ const Analytics = () => {
             </Typography>
             <Grid container spacing={2}>
               {districtStats.map((district, index) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={district.district}>
+                <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={district.district}>
                   <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                     <CardContent sx={{ p: 2 }}>
                       <Typography variant="subtitle1" fontWeight={600} sx={{ 

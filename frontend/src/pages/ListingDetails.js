@@ -48,9 +48,11 @@ import SecurityIcon from '@mui/icons-material/Security';
 import OpacityIcon from '@mui/icons-material/Opacity';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ReportProblem from '@mui/icons-material/ReportProblem';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+// Report is handled via the central ReportForm page
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -61,6 +63,7 @@ export default function ListingDetails() {
   const [error, setError] = useState('');
   const [mainIdx, setMainIdx] = useState(0);
   const [showDescFull, setShowDescFull] = useState(false);
+  // Navigate to central report form with prefilled params
 
   useEffect(() => {
     let active = true;
@@ -116,7 +119,7 @@ export default function ListingDetails() {
   const address = [data.houseNo, data.road, data.area, data.subdistrict, data.district, data.division].filter(Boolean).join(', ');
   const features = data.features || [];
   const utilities = data.utilitiesIncluded || [];
-  const isOwner = user && data.userId === user.id;
+  const isOwner = user && data && data.userId === user.id;
   const lat = Number.isFinite(Number(data?.lat)) ? Number(data.lat) : (Number.isFinite(Number(data?.location?.coordinates?.[1])) ? Number(data.location.coordinates[1]) : NaN);
   const lng = Number.isFinite(Number(data?.lng)) ? Number(data.lng) : (Number.isFinite(Number(data?.location?.coordinates?.[0])) ? Number(data.location.coordinates[0]) : NaN);
   const hasPoint = Number.isFinite(lat) && Number.isFinite(lng);
@@ -324,13 +327,39 @@ export default function ListingDetails() {
                   <Button fullWidth variant="contained" component={Link} to={`/edit/${data._id}`}>Edit Listing</Button>
                 </Stack>
               )}
+              {!isOwner && user && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="error"
+                    onClick={() => {
+                      const params = new URLSearchParams({
+                        type: 'listing',
+                        id: id,
+                        owner: data.userId || '',
+                        title: data.title || ''
+                      });
+                      navigate(`/report-form?${params.toString()}`);
+                    }}
+                    startIcon={<ReportProblem />}
+                  >
+                    Report Listing
+                  </Button>
+                </Stack>
+              )}
+              {!user && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Please log in to report this listing
+                </Typography>
+              )}
             </Paper>
             {features.length > 0 && (
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, letterSpacing: 0.5 }}>Facilities / Features</Typography>
-                <Grid container spacing={1.2}>
+        <Grid container spacing={1.2}>
                   {features.map(f => (
-                    <Grid key={f} item xs={6} sm={6}>
+          <Grid key={f} size={{ xs: 6, sm: 6 }}>
                       <FeatureBadge feature={f} />
                     </Grid>
                   ))}
@@ -348,6 +377,7 @@ export default function ListingDetails() {
           </Stack>
         </Box>
       </Box>
+  {/* Report modal removed in favor of unified report form route */}
     </Box>
   );
 }

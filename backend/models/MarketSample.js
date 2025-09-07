@@ -14,6 +14,8 @@ const MarketSampleSchema = new mongoose.Schema({
   bathrooms: Number,
   seats: Number, // from CSV 'seats'
   rentPerRoom: Number, // from CSV 'rent_per_room'
+  // Optional size in square feet when available in source data
+  areaSqft: Number,
   availableFrom: String, // keep as scraped string
   url: String,
   sourceFile: String,

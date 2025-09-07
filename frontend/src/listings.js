@@ -2,35 +2,50 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth';
-import { Box, Button, Chip, CircularProgress, Grid, Stack, ToggleButton, ToggleButtonGroup, Typography, Card, CardContent, CardMedia, CardActions, Paper, TextField, InputAdornment, IconButton } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Grid, Stack, ToggleButton, ToggleButtonGroup, Typography, Card, CardContent, CardMedia, CardActions, Paper, TextField, InputAdornment, IconButton, Alert } from '@mui/material';
 import { Button as UiButton } from './components/ui/button';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 
 export default function Listings() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [statusSeg, setStatusSeg] = useState('all'); // all | available | rented
   const [typeSeg, setTypeSeg] = useState('all'); // all | Apartment | Room | Sublet | Commercial | Hostel
   const [q, setQ] = useState(''); // search query
 
   useEffect(() => {
-    fetchListings();
+    if (user) {
+      fetchListings();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id]);
+  }, [user?.id]);
 
   const fetchListings = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const res = await axios.get('/api/listings', {
-        headers: { 'x-user-id': user.id },
+        headers: {
+          ...(localStorage.getItem('authToken') ? {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`
+          } : {})
+        }
       });
       setListings(res.data);
     } catch (err) {
-      alert('Error fetching listings');
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.error || 'Error fetching listings';
+      if (status === 401) {
+        // Don't automatically logout on 401; let user manually refresh or login
+        setError('Unable to fetch listings. Please refresh the page or log in again.');
+      } else {
+        alert(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -39,12 +54,29 @@ export default function Listings() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this listing?')) return;
     try {
-      await axios.delete(`/api/listings/${id}`, { headers: { 'x-user-id': user.id } });
+      await axios.delete(`/api/listings/${id}`, {
+        headers: {
+          ...(localStorage.getItem('authToken') ? {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`
+          } : {})
+        }
+      });
       setListings((prev) => prev.filter((l) => l._id !== id));
     } catch (err) {
       alert('Delete failed');
     }
   };
+
+  if (!user) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h5">Please log in to view your listings</Typography>
+        <Button variant="contained" onClick={() => navigate('/login')} sx={{ mt: 2 }}>
+          Login
+        </Button>
+      </Box>
+    );
+  }
 
   const filtered = listings.filter((l) => {
     const statusOk = statusSeg === 'all' || (statusSeg === 'rented' ? !!l.isRented : !l.isRented);
@@ -64,6 +96,12 @@ export default function Listings() {
           <Link to="/add">Add Listing</Link>
         </UiButton>
       </Stack>
+
+      {error && (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
 
       <Paper
         variant="outlined"
@@ -146,7 +184,7 @@ export default function Listings() {
       ) : (
   <Grid container spacing={2.5}>
           {filtered.map((l) => (
-            <Grid item xs={12} sm={6} md={4} key={l._id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={l._id}>
               <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 380 }}>
                 <Box sx={{ height: 200, position: 'relative', bgcolor: 'grey.100', overflow: 'hidden' }}>
                   {l.photoUrls?.[0] ? (

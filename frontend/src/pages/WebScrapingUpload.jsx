@@ -178,7 +178,7 @@ const WebScrapingUpload = () => {
 
       <Grid container spacing={3}>
         {/* Upload Section */}
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Card elevation={3} sx={{ height: '100%' }}>
             <CardContent>
               <Box sx={{ textAlign: 'center', p: 3 }}>
@@ -267,7 +267,7 @@ const WebScrapingUpload = () => {
         </Grid>
 
         {/* Summary Section */}
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <Card elevation={3} sx={{ height:'100%', display:'flex', flexDirection:'column' }}>
             <CardContent sx={{ flexGrow:1, display:'flex', flexDirection:'column' }}>
               <Box sx={{ display:'flex', alignItems:'center', mb:2 }}>
@@ -282,7 +282,7 @@ const WebScrapingUpload = () => {
               {filesMeta.filter(f=>f.result).length>0 && (
                 <Grid container spacing={2}>
                   {filesMeta.filter(f=>f.result).map((f,i)=>(
-                    <Grid item xs={12} sm={6} md={4} key={i}>
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={i}>
                       <Paper sx={{ p:1.5, height:'100%', display:'flex', flexDirection:'column' }} variant="outlined">
                         <Typography variant="subtitle2" noWrap title={f.file.name}>{f.file.name}</Typography>
                         <Box sx={{ display:'flex', gap:0.5, flexWrap:'wrap', mt:1 }}>
@@ -364,7 +364,7 @@ const WebScrapingUpload = () => {
                     </Box>
                     <Grid container spacing={1} sx={{ mt:1 }}>
                       {['property_type','area','district','location','rent','rent_category','bedrooms','rooms','bathrooms','seats','rent_per_room','available_from','url','scraped_at'].map(f => (
-                        <Grid key={f} item xs={6} sm={4} md={3}>
+                        <Grid key={f} size={{ xs: 6, sm: 4, md: 3 }}>
                           <Typography variant="caption" color="text.secondary">{f}</Typography>
                           <Typography variant="body2" noWrap>{row[f] || '-'}</Typography>
                         </Grid>

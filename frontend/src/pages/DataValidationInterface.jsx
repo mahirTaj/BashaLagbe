@@ -489,7 +489,7 @@ const DataValidationInterface = () => {
 
       {/* Statistics Cards */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Total Records"
             value={validationStats.total || 0}
@@ -497,7 +497,7 @@ const DataValidationInterface = () => {
             icon={<Info sx={{ fontSize: 40 }} />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Valid Records"
             value={validationStats.valid || 0}
@@ -505,7 +505,7 @@ const DataValidationInterface = () => {
             icon={<CheckCircle sx={{ fontSize: 40 }} />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Warnings"
             value={validationStats.warning || 0}
@@ -513,7 +513,7 @@ const DataValidationInterface = () => {
             icon={<Warning sx={{ fontSize: 40 }} />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Errors"
             value={validationStats.error || 0}
@@ -532,7 +532,7 @@ const DataValidationInterface = () => {
         
         <Grid container spacing={3}>
           {/* Error Conditions */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#ffebee', border: '1px solid #ffcdd2' }}>
               <Typography variant="subtitle1" fontWeight={600} color="error" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Error fontSize="small" />
@@ -549,7 +549,7 @@ const DataValidationInterface = () => {
           </Grid>
 
           {/* Warning Conditions */}
-          <Grid item xs={12} md={4}>
+          <Grid item size={{ xs: 12, md: 4 }}>
             <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#fff3e0', border: '1px solid #ffcc02' }}>
               <Typography variant="subtitle1" fontWeight={600} color="warning.main" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Warning fontSize="small" />
@@ -571,7 +571,7 @@ const DataValidationInterface = () => {
           </Grid>
 
           {/* Valid Conditions */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#e8f5e8', border: '1px solid #c8e6c9' }}>
               <Typography variant="subtitle1" fontWeight={600} color="success.main" mb={1} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CheckCircle fontSize="small" />
@@ -802,7 +802,7 @@ const DataValidationInterface = () => {
         <DialogContent>
           {editDialog.data && (
             <Grid container spacing={3} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Title"
@@ -813,7 +813,7 @@ const DataValidationInterface = () => {
                   })}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <TextField
                   fullWidth
                   label="Property Type"
@@ -824,7 +824,7 @@ const DataValidationInterface = () => {
                   })}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <TextField
                   fullWidth
                   label="Area"
@@ -835,7 +835,7 @@ const DataValidationInterface = () => {
                   })}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <TextField
                   fullWidth
                   label="District"

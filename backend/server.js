@@ -4,13 +4,21 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+// Load environment variables from .env when present
+try { require('dotenv').config(); } catch (e) {}
 
 const listingsRoute = require('./routes/listings');
 const adminRoute = require('./routes/admin');
+const authRoute = require('./routes/auth');
+const trendsRoute = require('./routes/trends');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: true, // Allow all origins for development
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
+}));
 app.use(express.json());
 
 // Serve uploaded assets
@@ -20,13 +28,25 @@ app.use('/uploads', express.static(uploadsPath));
 
 app.use('/api/listings', listingsRoute);
 app.use('/api/admin', adminRoute);
+app.use('/api/auth', authRoute);
+app.use('/api/trends', trendsRoute);
 
-const mongoURI = 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+// Root health/status endpoint
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    service: 'BashaLagbe backend',
+    endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
+  });
+});
+
+const mongoURI = process.env.MONGO_URI || 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(mongoURI)
   .then(() => {
     console.log('MongoDB connected');
-    app.listen(5000, () => console.log('Server running on port 5000'));
+  const port = process.env.PORT || 5000;
+  app.listen(port, () => console.log('Server running on port', port));
   })
   .catch(err => console.error(err));
 
