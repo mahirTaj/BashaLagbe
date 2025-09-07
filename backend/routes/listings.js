@@ -5,10 +5,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Simple auth helper used during merge: take user id from header 'x-user-id' or query '?userId='
-function getUserId(req) {
-  return (req.headers['x-user-id'] || req.query.userId || '').toString();
-}
+const auth = require('../middleware/auth');
+
+// NOTE: For management endpoints we require JWT auth and use req.user.id as the canonical owner id.
+// The previous getUserId helper allowed a dev 'x-user-id' header; we intentionally require auth for
+// create/update/delete and listing management to prevent exposing all listings to any caller.
 
 // Multer storage for uploads
 const storage = multer.diskStorage({
@@ -48,10 +49,10 @@ async function unlinkSafe(filePath) {
 // --------------------------------------------------
 // Create listing (requires userId)
 // --------------------------------------------------
-router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+router.post('/', auth, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
-    const userId = getUserId(req);
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const userId = req.user && (req.user.id || req.user._id) ? String(req.user.id || req.user._id) : '';
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     const base = `${req.protocol}://${req.get('host')}`;
     const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
@@ -114,11 +115,12 @@ router.post('/', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video
 // --------------------------------------------------
 // Basic get (optionally restricted to user via header) - kept for existing UI
 // --------------------------------------------------
-router.get('/', async (req, res) => {
+// Return listings for the authenticated user (management). Public browsing uses /search and /:id.
+router.get('/', auth, async (req, res) => {
   try {
-    const userId = getUserId(req);
-    const filter = userId ? { userId } : {};
-    const listings = await Listing.find(filter).sort({ createdAt: -1 });
+    const userId = req.user && (req.user.id || req.user._id) ? String(req.user.id || req.user._id) : '';
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+    const listings = await Listing.find({ userId }).sort({ createdAt: -1 });
     res.json(listings);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -266,10 +268,10 @@ router.get('/:id', async (req, res) => {
 // --------------------------------------------------
 // Update listing (only by owner)
 // --------------------------------------------------
-router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+router.put('/:id', auth, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
-    const userId = getUserId(req);
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const userId = req.user && (req.user.id || req.user._id) ? String(req.user.id || req.user._id) : '';
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     const doc = await Listing.findOne({ _id: req.params.id, userId });
     if (!doc) return res.status(404).json({ error: 'Not found or not owner' });
@@ -360,10 +362,10 @@ router.put('/:id', upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'vid
 // --------------------------------------------------
 // Delete listing (owner only)
 // --------------------------------------------------
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
-    const userId = getUserId(req);
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const userId = req.user && (req.user.id || req.user._id) ? String(req.user.id || req.user._id) : '';
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
     if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });

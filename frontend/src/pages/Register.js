@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../auth';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -8,6 +9,7 @@ export default function Register() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,21 +20,14 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-      const data = await res.json();
+      const data = await register(name, email, password);
       setLoading(false);
-      if (!res.ok) {
-        setMessage(data.message || data.error || 'Registration failed');
-        return;
+      if (data?.token) {
+        setMessage('Registration successful! Redirecting...');
+        setTimeout(() => navigate('/profile'), 1000);
+      } else {
+        setMessage('Registration failed');
       }
-      setMessage('Registration successful! Redirecting to login...');
-      setTimeout(() => {
-        navigate('/login');
-      }, 1200);
     } catch (err) {
       setLoading(false);
       setMessage('Error: ' + err.message);

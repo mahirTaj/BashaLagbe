@@ -50,9 +50,14 @@ export default function AddEditListing() {
 
   useEffect(() => {
     if (!id) return;
+    // Require authenticated user to load edit page
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     (async () => {
       try {
-        const res = await axios.get(`/api/listings/${id}`, { headers: { 'x-user-id': user.id } });
+        const res = await axios.get(`/api/listings/${id}`);
         const data = res.data;
         // Robustly format date to YYYY-MM-DD for the date input
         const toYMD = (val) => {
@@ -103,7 +108,9 @@ export default function AddEditListing() {
         setNewVideo(null);
         setRemoveVideo(false);
       } catch (e) {
-        alert('Failed to load listing');
+        // If unauthorized, redirect to login
+        if (e?.response?.status === 401) navigate('/login');
+        else alert('Failed to load listing');
       }
     })();
   }, [id, user.id]);
@@ -258,9 +265,10 @@ export default function AddEditListing() {
     fd.append('existingVideoUrl', videoUrl);
   }
 
-      const headers = { 'x-user-id': user.id };
-      if (id) await axios.put(`/api/listings/${id}`, fd, { headers });
-      else await axios.post('/api/listings', fd, { headers });
+  // Require authentication
+  if (!user) return navigate('/login');
+  if (id) await axios.put(`/api/listings/${id}`, fd);
+  else await axios.post('/api/listings', fd);
       navigate('/');
     } catch (e) {
       const status = e?.response?.status;

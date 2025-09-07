@@ -7,6 +7,7 @@ import ListingDetails from './pages/ListingDetails';
 import MoveInScheduler from './pages/MoveInScheduler';
 import { AuthProvider, useAuth } from './auth';
 import OAuthSuccess from './pages/OAuthSuccess';
+import AuthDebug from './components/AuthDebug';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -17,7 +18,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 
 function Nav() {
-  const { user, switchUser } = useAuth();
+  const { user, logout, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -44,25 +45,34 @@ function Nav() {
   return (
     <div className="nav">
       <span className="nav-title" onClick={() => navigate('/')}>BashaLagbe</span>
-      <Link to="/listings">My Listings</Link>
-      <Link to="/browse" style={{ marginLeft: 8 }}>Browse</Link>
-      <Link to="/profile" style={{ marginLeft: 8 }}>Profile</Link>
-      <Link to="/add" className="btn" style={{ marginLeft: 8 }}>Add Listing</Link>
-      <form className="nav-search-form" onSubmit={onFormSubmit}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input
-          value={searchVal}
-          onChange={(e) => setSearchVal(e.target.value)}
-          placeholder="Search rentals..."
-          aria-label="Search rentals"
-        />
-        {searchVal && <button type="button" className="icon-btn clear" onClick={clearSearch} aria-label="Clear" title="Clear">×</button>}
-        <button type="submit" className="btn sm" aria-label="Search">Search</button>
-      </form>
-      <div className="nav-spacer">
-        <span className="user-chip">{user?.name || 'Guest'}</span>
-        <button className="icon-btn" onClick={switchUser}>Switch</button>
-      </div>
+      {/* When not authenticated (or while auth is loading) we only show the logo */}
+      {!user && !loading && null}
+      {/* When authenticated, show the full navigation */}
+      {user && (
+        <>
+          <Link to="/listings">My Listings</Link>
+          <Link to="/browse" style={{ marginLeft: 8 }}>Browse</Link>
+          <Link to="/profile" style={{ marginLeft: 8 }}>Profile</Link>
+          <Link to="/add" className="btn" style={{ marginLeft: 8 }}>Add Listing</Link>
+
+          <form className="nav-search-form" onSubmit={onFormSubmit}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <input
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              placeholder="Search rentals..."
+              aria-label="Search rentals"
+            />
+            {searchVal && <button type="button" className="icon-btn clear" onClick={clearSearch} aria-label="Clear" title="Clear">×</button>}
+            <button type="submit" className="btn sm" aria-label="Search">Search</button>
+          </form>
+
+          <div className="nav-spacer">
+            <span className="user-chip">{user?.name || 'User'}</span>
+            <button className="icon-btn" onClick={() => { logout(); navigate('/'); }}>Logout</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -100,6 +110,7 @@ function AppRoutes() {
       <Route path="/browse" element={<Browse />} />
   <Route path="/movein" element={<MoveInScheduler />} />
       <Route path="/listing/:id" element={<ListingDetails />} />
+  {/* Compare page removed: comparison is available per-listing via CompareModal */}
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
@@ -108,20 +119,19 @@ function AppRoutes() {
 
 function AppContent() {
   const location = useLocation();
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('bl_token');
   const navigate = useNavigate();
-
-  // Only show Nav if not on login page and user is authenticated
-  const showNav = token && location.pathname !== '/login';
+  const params = new URLSearchParams(location.search || '');
+  const showAuthDebug = params.get('debug_auth') === '1';
+  // Demo flow: always show Nav (previous behavior)
   return (
     <>
-      {showNav && (
-        <div className="toolbar">
-          <Nav />
-        </div>
-      )}
+      <div className="toolbar">
+        <Nav />
+      </div>
       <div className="container">
         <AppRoutes />
+        {showAuthDebug && <AuthDebug />}
       </div>
     </>
   );

@@ -90,4 +90,15 @@ app.get('/__debug/routes', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Temporary debug route to inspect authenticated user vs dev header
+app.get('/__debug/whoami', (req, res) => {
+  try {
+    // Note: some older dev endpoints accepted x-user-id header for testing.
+    // Production/protected endpoints now require JWT auth and ignore header-based identity.
+    const headerUser = req.headers['x-user-id'] || null;
+    const sessionUser = req.user || null;
+    res.json({ headerUser, sessionUser, note: 'Protected endpoints ignore x-user-id; use Authorization: Bearer <token>' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = app;

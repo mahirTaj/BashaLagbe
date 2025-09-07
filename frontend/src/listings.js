@@ -20,14 +20,17 @@ export default function Listings() {
   useEffect(() => {
     fetchListings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id]);
+  }, [user?.id]);
 
   const fetchListings = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/listings', {
-        headers: { 'x-user-id': user.id },
-      });
+        if (!user) {
+          // If not logged in, redirect to login to encourage authentication for management
+          navigate('/login');
+          return;
+        }
+        const res = await axios.get('/api/listings');
       setListings(res.data);
     } catch (err) {
       alert('Error fetching listings');
@@ -39,7 +42,8 @@ export default function Listings() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this listing?')) return;
     try {
-      await axios.delete(`/api/listings/${id}`, { headers: { 'x-user-id': user.id } });
+      if (!user) return navigate('/login');
+      await axios.delete(`/api/listings/${id}`);
       setListings((prev) => prev.filter((l) => l._id !== id));
     } catch (err) {
       alert('Delete failed');

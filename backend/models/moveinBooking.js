@@ -5,6 +5,7 @@ const MoveInBookingSchema = new mongoose.Schema({
   listingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Listing', required: true },
   tenantId: { type: String, required: true },
   tenantName: { type: String },
+  tenantPhone: { type: String },
   createdAt: { type: Date, default: Date.now },
   reminderSent: { type: Boolean, default: false },
 });

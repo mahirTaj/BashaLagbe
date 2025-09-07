@@ -1,37 +1,35 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../auth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage(data.message || data.error || 'Login failed');
-        return;
-      }
-      localStorage.setItem('token', data.token);
-      setMessage('Login successful! Welcome, ' + data.user.name);
+      const data = await login(email, password);
+      if (!data) return setMessage('Login failed');
+      setMessage('Login successful! Welcome, ' + (data.user?.name || ''));
       setTimeout(() => {
         navigate('/profile');
-      }, 1000);
+      }, 800);
     } catch (err) {
-      setMessage('Error: ' + err.message);
+      // show common message keys
+      const serverMsg = err?.response?.data?.msg || err?.response?.data?.message || err?.response?.data?.error;
+      // eslint-disable-next-line no-console
+      console.error('Login error', err?.response?.data || err.message);
+      setMessage(serverMsg || err.message || 'Login failed');
     }
   };
 
   const handleGoogleLogin = () => {
+    // Use absolute backend URL so the browser navigates to the backend OAuth entrypoint
     window.location.href = 'http://localhost:5000/api/auth/google';
   };
 

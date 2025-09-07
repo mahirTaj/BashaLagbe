@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -17,10 +18,11 @@ export default function Profile() {
   const [passwords, setPasswords] = useState({ oldPassword: '', newPassword: '' });
   const [pwMessage, setPwMessage] = useState('');
   const navigate = useNavigate();
+  const auth = useAuth();
 
   // Helper: logout and redirect
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    if (auth && auth.logout) auth.logout();
     navigate('/login');
   };
 
@@ -34,25 +36,18 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      handleLogout();
-      return;
+    // rely on AuthProvider to fetch profile; we can also fetch directly if needed
+    if (auth && auth.user) {
+      setUser(auth.user);
+      setForm({
+        name: auth.user.name,
+        email: auth.user.email,
+        contact: auth.user.contact || '',
+        preferences: auth.user.preferences || '',
+        profilePic: auth.user.profilePic || ''
+      });
     }
-    axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => {
-        setUser(res.data);
-        setForm({
-          name: res.data.name,
-          email: res.data.email,
-          contact: res.data.contact || '',
-          preferences: res.data.preferences || '',
-          profilePic: res.data.profilePic || ''
-        });
-      })
-      .catch(handleAxiosError);
-    // eslint-disable-next-line
-  }, []);
+  }, [auth && auth.user]);
 
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -66,7 +61,6 @@ export default function Profile() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
     let updatedForm = { ...form };
 
     try {
@@ -74,13 +68,11 @@ export default function Profile() {
       if (profilePicFile) {
         const picData = new FormData();
         picData.append('profilePic', profilePicFile);
-        const picRes = await axios.post('/api/auth/upload-profile-pic', picData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const picRes = await axios.post('/api/auth/upload-profile-pic', picData);
         updatedForm.profilePic = picRes.data.url;
       }
 
-      const res = await axios.put('/api/auth/profile', updatedForm, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.put('/api/auth/profile', updatedForm);
       setUser(res.data);
       setForm({
         ...form,
@@ -100,9 +92,8 @@ export default function Profile() {
 
   const handlePasswordSubmit = async e => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
     try {
-      await axios.post('/api/auth/change-password', passwords, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post('/api/auth/change-password', passwords);
       setPwMessage('Password changed successfully!');
     } catch (err) {
       setPwMessage('Password change failed.');

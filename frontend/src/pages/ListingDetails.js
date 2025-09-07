@@ -48,6 +48,8 @@ import SecurityIcon from '@mui/icons-material/Security';
 import OpacityIcon from '@mui/icons-material/Opacity';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CompareModal from '../components/CompareModal';
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -58,6 +60,77 @@ export default function ListingDetails() {
   const [error, setError] = useState('');
   const [mainIdx, setMainIdx] = useState(0);
   const [showDescFull, setShowDescFull] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  // Move-in slots state and actions (must be declared at top-level to satisfy hooks rules)
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotForm, setSlotForm] = useState({ start: '', end: '', capacity: 1 });
+  const [slotOpLoading, setSlotOpLoading] = useState(false);
+  const [slotBookings, setSlotBookings] = useState({});
+
+  // fetchSlots depends on `data` and is declared here as a function (not a hook)
+  async function fetchSlots() {
+    if (!data || !data._id) return;
+    setSlotsLoading(true);
+    try {
+      const res = await axios.get('/api/movein/slots', { params: { listingId: data._id } });
+      setSlots(res.data || []);
+    } catch (e) {
+      console.error('Failed to load slots', e);
+    } finally { setSlotsLoading(false); }
+  }
+
+  // Load slots once listing is loaded
+  useEffect(() => {
+    fetchSlots();
+    // eslint-disable-next-line
+  }, [data && data._id]);
+
+  async function createSlot() {
+    if (!data) return alert('No listing selected');
+    // owner check will be done before calling; keep guard here as well
+    const { start, end, capacity } = slotForm;
+    if (!start || !end) return alert('Start and end are required');
+    setSlotOpLoading(true);
+    try {
+      if (!user) return navigate('/login');
+      // Ensure only owner can create
+      if (String(data.userId) !== String(user.id)) {
+        alert('Only the listing owner can create slots');
+        return;
+      }
+      await axios.post('/api/movein/slots', { listingId: data._id, start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity });
+      setSlotForm({ start: '', end: '', capacity: 1 });
+      fetchSlots();
+      alert('Slot created');
+    } catch (e) {
+      if (e?.response?.status === 401) navigate('/login');
+      else alert(e.response?.data?.error || e.message);
+    } finally { setSlotOpLoading(false); }
+  }
+
+  async function bookSlot(slotId) {
+    setSlotOpLoading(true);
+    try {
+      if (!user) return navigate('/login');
+      await axios.post('/api/movein/book', { slotId, tenantName: user?.name || 'Tenant', tenantPhone: user?.phone || '' });
+      fetchSlots();
+      alert('Booked successfully');
+    } catch (e) { alert(e.response?.data?.error || e.message); }
+    finally { setSlotOpLoading(false); }
+  }
+
+  async function fetchSlotBookings(slotId) {
+    try {
+      if (!user) return navigate('/login');
+      const res = await axios.get('/api/movein/bookings', { params: { slotId } });
+      setSlotBookings(s => ({ ...s, [slotId]: res.data }));
+    } catch (e) {
+      if (e?.response?.status === 401) navigate('/login');
+      else alert(e.response?.data?.error || e.message);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -114,8 +187,10 @@ export default function ListingDetails() {
   const features = data.features || [];
   const utilities = data.utilitiesIncluded || [];
   const isOwner = user && data.userId === user.id;
+ 
 
   return (
+    <>
     <Box sx={{ display: 'grid', gap: 2 }}>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
         <Button startIcon={<ArrowBackIcon />} size="small" onClick={() => navigate(-1)} variant="text">Back</Button>
@@ -198,8 +273,19 @@ export default function ListingDetails() {
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{data.title}</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{address}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{data.title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{address}</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" color="text.secondary">ID</Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{data._id}</Typography>
+                  <Tooltip title="Copy listing ID"><IconButton size="small" onClick={() => { navigator.clipboard?.writeText(data._id); alert('Listing ID copied'); }}><ContentCopyIcon fontSize="small" /></IconButton></Tooltip>
+                </Box>
+              </Box>
+            </Box>
             <Box sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5, display: 'flex', alignItems: 'baseline', gap: 1 }}>
                 ৳{data.price.toLocaleString()}
@@ -282,10 +368,72 @@ export default function ListingDetails() {
               <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>Landlord Contact</Typography>
               <ContactRow label="Name" value={data.contactName || 'Not provided'} />
               <ContactRow label="Phone" value={data.phone || 'Not provided'} />
+              <Box sx={{ mt: 1 }}>
+                <Button fullWidth variant="outlined" onClick={() => setCompareOpen(true)}>Compare</Button>
+              </Box>
               {isOwner && (
                 <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
                   <Button fullWidth variant="contained" component={Link} to={`/edit/${data._id}`}>Edit Listing</Button>
                 </Stack>
+              )}
+            </Paper>
+            {/* Move-in slots panel */}
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>Move-in Slots</Typography>
+              {slotsLoading ? <CircularProgress size={20} /> : (
+                <Box>
+                  {slots.length === 0 && <Typography variant="body2" color="text.secondary">No slots available.</Typography>}
+                  <Box sx={{ display: 'grid', gap: 1, mt: 1 }}>
+                    {slots.sort((a,b)=>new Date(a.slot.start)-new Date(b.slot.start)).map(({ slot, booked }) => {
+                      const isOwnerSlot = String(slot.landlordId) === String(user?.id || user?._id || '');
+                      const canBook = !isOwnerSlot && booked < slot.capacity;
+                      const bookingsForSlot = slotBookings[slot._id] || null;
+                      return (
+                        <Box key={slot._id} sx={{ border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{new Date(slot.start).toLocaleString()} - {new Date(slot.end).toLocaleString()}</Typography>
+                          <Typography variant="caption" color="text.secondary">Booked: {booked} / {slot.capacity}</Typography>
+                          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                            {isOwnerSlot ? (
+                              <>
+                                <Button size="small" variant="outlined" onClick={() => fetchSlotBookings(slot._id)}>View</Button>
+                              </>
+                            ) : (
+                              <Button size="small" disabled={!canBook || slotOpLoading} variant="contained" onClick={() => bookSlot(slot._id)}>Book</Button>
+                            )}
+                          </Stack>
+
+                          {/* Owner view: show bookings list when loaded */}
+                          {isOwnerSlot && bookingsForSlot && (
+                            <Box sx={{ mt: 1, borderTop: '1px dashed', borderColor: 'divider', pt: 1 }}>
+                              {bookingsForSlot.length === 0 && <Typography variant="caption" color="text.secondary">No bookings yet.</Typography>}
+                              {bookingsForSlot.map(b => (
+                                <Box key={b.bookingId} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 0.5 }}>
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{b.tenantName || 'Guest'}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{b.tenantId}</Typography>
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="body2">{b.phone || 'Phone not provided'}</Typography>
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
+
+              {isOwner && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Add Slot</Typography>
+                  <input type="datetime-local" value={slotForm.start} onChange={(e) => setSlotForm(s => ({ ...s, start: e.target.value }))} />
+                  <input type="datetime-local" value={slotForm.end} onChange={(e) => setSlotForm(s => ({ ...s, end: e.target.value }))} />
+                  <input type="number" min={1} value={slotForm.capacity} onChange={(e) => setSlotForm(s => ({ ...s, capacity: Number(e.target.value) }))} style={{ width: 80, display: 'block', marginTop: 8 }} />
+                  <Button size="small" sx={{ mt: 1 }} onClick={createSlot} disabled={slotOpLoading} variant="contained">Create Slot</Button>
+                </Box>
               )}
             </Paper>
             {features.length > 0 && (
@@ -312,6 +460,8 @@ export default function ListingDetails() {
         </Box>
       </Box>
     </Box>
+    <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} baseListing={data} />
+    </>
   );
 }
 

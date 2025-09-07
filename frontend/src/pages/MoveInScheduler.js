@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../auth';
+import { useNavigate } from 'react-router-dom';
 
 export default function MoveInScheduler() {
   const [listingId, setListingId] = useState('');
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (listingId) fetchSlots();
@@ -22,8 +26,8 @@ export default function MoveInScheduler() {
 
   async function book(slotId) {
     try {
-      // For now tenant id is sent via header in our dev flow
-      const res = await axios.post('/api/movein/book', { slotId, tenantName: 'Guest Tenant' }, { headers: { 'x-user-id': 'tenant_demo' } });
+      if (!user) return navigate('/login');
+      await axios.post('/api/movein/book', { slotId, tenantName: user.name || 'Tenant' });
       alert('Booked!');
       fetchSlots();
     } catch (e) { alert(e.response?.data?.error || e.message); }
