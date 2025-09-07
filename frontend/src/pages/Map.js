@@ -65,7 +65,10 @@ export default function MapPage() {
 
   return (
     <div className="container" style={{ display: 'grid', gap: 12 }}>
-      <h2 style={{ margin: 0 }}>Map (Bangladesh)</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h2 style={{ margin: 0 }}>Map (Bangladesh)</h2>
+        <Link to="/heatmap" className="btn sm" style={{ marginLeft: 6 }}>Heatmap</Link>
+      </div>
       {err && <div className="card" style={{ color: 'red' }}>{err}</div>}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <MapContainer

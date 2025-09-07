@@ -376,7 +376,7 @@ const Analytics = () => {
 
           {/* Stats Overview */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Total Properties"
                 value={filteredStats.totalProperties.toLocaleString()}
@@ -385,7 +385,7 @@ const Analytics = () => {
                 subtitle={selectedDistrict ? `In ${selectedDistrict}` : "Scraped samples"}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Rent"
                 value={`৳${filteredStats.avgRent.toLocaleString()}`}
@@ -394,7 +394,7 @@ const Analytics = () => {
                 subtitle="Per month"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Districts Covered"
                 value={filteredStats.totalDistricts}
@@ -403,7 +403,7 @@ const Analytics = () => {
                 subtitle={selectedDistrict ? "Selected district" : `${overallStats.uniqueAreas} areas`}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Properties This Month"
                 value={filteredStats.propertiesThisMonth}
@@ -416,7 +416,7 @@ const Analytics = () => {
 
           {/* Property Features Stats */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Bedrooms"
                 value={featureAverages.avgBedrooms || 'N/A'}
@@ -425,7 +425,7 @@ const Analytics = () => {
                 subtitle={selectedDistrict || selectedArea ? 'Filtered' : 'Overall'}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Bathrooms"
                 value={featureAverages.avgBathrooms || 'N/A'}
@@ -434,7 +434,7 @@ const Analytics = () => {
                 subtitle={selectedDistrict || selectedArea ? 'Filtered' : 'Overall'}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Average Rooms"
                 value={featureAverages.avgRooms || 'N/A'}
@@ -443,7 +443,7 @@ const Analytics = () => {
                 subtitle={selectedDistrict || selectedArea ? 'Filtered' : 'Overall'}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 title="Data Quality"
                 value={`${((overallStats.totalProperties / (overallStats.totalProperties + 100)) * 100).toFixed(1)}%`}
@@ -456,7 +456,7 @@ const Analytics = () => {
 
           {/* Charts Grid */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Paper sx={{ p: 3, borderRadius: 3 }}>
                 {(() => {
                   const dataset = selectedArea
@@ -510,7 +510,7 @@ const Analytics = () => {
 
           {/* Second Row: Property Count (wide scrollable) */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Paper sx={{ p: 3, borderRadius: 3 }}>
                 {(() => {
                   const dataset = selectedArea
@@ -560,7 +560,7 @@ const Analytics = () => {
 
           {/* Third Row - Property Types Chart (full width, filter-aware) */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Paper sx={{ p: 3, borderRadius: 3 }}>
                 <Typography variant="h6" fontWeight={700} mb={2}>
                   Property Types Distribution {selectedDistrict && `- ${selectedDistrict}`}{selectedArea && ` / ${selectedArea}`}
@@ -603,9 +603,9 @@ const Analytics = () => {
             <Typography variant="h6" fontWeight={700} mb={2}>
               District-wise Statistics (All {districtStats.length} Districts)
             </Typography>
-            <Grid container spacing={2}>
+      <Grid container spacing={2}>
               {districtStats.map((district, index) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={district.district}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={district.district}>
                   <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                     <CardContent sx={{ p: 2 }}>
                       <Typography variant="subtitle1" fontWeight={600} sx={{ 

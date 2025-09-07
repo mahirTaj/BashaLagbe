@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Link, Navigate, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import Listings from './listings';
 import AddEditListing from './pages/AddEditListing';
 import Browse from './pages/Browse';
 import ListingDetails from './pages/ListingDetails';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import MapPage from './pages/Map';
 import { AuthProvider, useAuth } from './auth';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
@@ -23,8 +25,30 @@ import ExploreIcon from '@mui/icons-material/Explore';
 import MapIcon from '@mui/icons-material/Map';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ReportIcon from '@mui/icons-material/Report';
+import PersonIcon from '@mui/icons-material/Person';
+import BusinessIcon from '@mui/icons-material/Business';
+import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
+import Analytics from './pages/Analytics';
+import RentalTrends from './pages/RentalTrends';
+import RentTrendsDashboard from './components/RentTrendsDashboard';
+import CompareAreas from './pages/CompareAreas';
+import RentHeatmap from './pages/RentHeatmap';
+import UserReports from './pages/UserReports';
+import UserProfile from './pages/UserProfile';
+import ReportForm from './pages/ReportForm';
 
-// Styled components for premium navbar
+// Lazy import to avoid circular dependency
+const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
+const AdminReports = React.lazy(() => import('./pages/AdminReports'));
+const WebScrapingUpload = React.lazy(() => import('./pages/WebScrapingUpload'));
+const DataValidationInterface = React.lazy(() => import('./pages/DataValidationInterface'));
+const ScrapedData = React.lazy(() => import('./pages/MarketSamples'));
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
   borderRadius: 12,
@@ -90,13 +114,14 @@ const NavButton = styled(Button)(({ theme }) => ({
 }));
 
 function Nav() {
-  const { user, switchUser } = useAuth();
+  const { user, logout } = useAuth();
   const { isAdminLoggedIn } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const qParam = params.get('q') || '';
   const [searchVal, setSearchVal] = useState(qParam);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   // keep input synced when navigating back/forward
   useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
@@ -108,9 +133,6 @@ function Nav() {
       navigate('/admin-login');
     }
   };
-
-  // keep input synced when navigating back/forward
-  useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
 
   const submitSearch = () => {
     const p = new URLSearchParams(location.search);
@@ -124,6 +146,32 @@ function Nav() {
     setSearchVal('');
     const p = new URLSearchParams(location.search); p.delete('q');
     navigate({ pathname: '/browse', search: p.toString() });
+  };
+
+  const handleUserMenuOpen = (event) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const handleLogout = () => {
+    handleUserMenuClose();
+    logout();
+    navigate('/');
+  };
+
+  const getRoleIcon = (role) => {
+    return role === 'owner' ? <BusinessIcon /> : <PersonIcon />;
+  };
+
+  const getRoleColor = (role) => {
+    return role === 'owner' ? '#4ade80' : '#60a5fa';
+  };
+
+  const getRoleLabel = (role) => {
+    return role === 'owner' ? 'Property Owner' : 'Tenant';
   };
 
   return (
@@ -169,6 +217,9 @@ function Nav() {
           <NavButton startIcon={<MapIcon />} onClick={() => navigate('/map')} data-active={location.pathname.startsWith('/map')}>
             Map
           </NavButton>
+          <NavButton startIcon={<AssessmentIcon />} onClick={() => navigate('/trends')} data-active={location.pathname.startsWith('/trends')}>
+            Trends
+          </NavButton>
           {/* Market Samples link moved into Admin Panel */}
           <NavButton onClick={handleAdminClick} data-active={location.pathname.startsWith('/admin')} sx={{ ml: 2, fontWeight: 700, color: isAdminLoggedIn ? '#4ade80' : '#facc15', border: `1px solid ${isAdminLoggedIn ? '#4ade80' : '#facc15'}`, borderRadius: 2 }}>
             {isAdminLoggedIn ? 'Admin Panel' : 'Admin'}
@@ -192,79 +243,261 @@ function Nav() {
 
         {/* User */}
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-          <IconButton onClick={switchUser} sx={{ color: '#e5e7eb', '&:hover': { color: '#fff' } }} aria-label="account">
-            <AccountCircleIcon />
-          </IconButton>
-          <Typography variant="body2" sx={{ color: 'rgba(248,250,252,0.9)', ml: 1, display: { xs: 'none', sm: 'block' } }}>
-            {user.name}
-          </Typography>
+          {user ? (
+            <>
+              {/* Report Button */}
+              <IconButton
+                color="inherit"
+                onClick={() => navigate('/report-form')}
+                sx={{
+                  mr: 1,
+                  color: 'rgba(248,250,252,0.8)',
+                  '&:hover': {
+                    color: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                  }
+                }}
+                title="Submit a Report"
+              >
+                <ReportIcon />
+              </IconButton>
+
+              {/* User Profile Section */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  p: 1,
+                  borderRadius: 2,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)'
+                  }
+                }}
+                onClick={handleUserMenuOpen}
+              >
+                <Avatar
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: getRoleColor(user.role),
+                    mr: 1.5
+                  }}
+                >
+                  {getRoleIcon(user.role)}
+                </Avatar>
+                <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'rgba(248,250,252,0.9)',
+                      fontWeight: 600,
+                      lineHeight: 1.2
+                    }}
+                  >
+                    {user.name || user.email}
+                  </Typography>
+                  <Chip
+                    label={getRoleLabel(user.role)}
+                    size="small"
+                    sx={{
+                      height: 18,
+                      fontSize: '0.7rem',
+                      backgroundColor: getRoleColor(user.role),
+                      color: 'white',
+                      fontWeight: 600,
+                      mt: 0.5
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* User Menu */}
+              <Menu
+                anchorEl={userMenuAnchor}
+                open={Boolean(userMenuAnchor)}
+                onClose={handleUserMenuClose}
+                PaperProps={{
+                  sx: {
+                    mt: 1.5,
+                    minWidth: 200,
+                    background: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95))',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(148,163,184,0.2)',
+                    borderRadius: 2
+                  }
+                }}
+              >
+                <Box sx={{ p: 2, pb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 600 }}>
+                    {user.name || 'User'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(248,250,252,0.7)' }}>
+                    {user.email}
+                  </Typography>
+                  <Chip
+                    label={getRoleLabel(user.role)}
+                    size="small"
+                    sx={{
+                      mt: 1,
+                      backgroundColor: getRoleColor(user.role),
+                      color: 'white',
+                      fontWeight: 600
+                    }}
+                  />
+                </Box>
+                <Divider sx={{ borderColor: 'rgba(148,163,184,0.2)' }} />
+                <MenuItem
+                  onClick={() => {
+                    handleUserMenuClose();
+                    navigate('/profile');
+                  }}
+                  sx={{
+                    color: 'rgba(248,250,252,0.9)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.1)'
+                    }
+                  }}
+                >
+                  <PersonIcon sx={{ mr: 1.5, fontSize: 18 }} />
+                  My Profile
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleUserMenuClose();
+                    navigate('/report-form');
+                  }}
+                  sx={{
+                    color: 'rgba(248,250,252,0.9)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.1)'
+                    }
+                  }}
+                >
+                  <ReportIcon sx={{ mr: 1.5, fontSize: 18 }} />
+                  Submit Report
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleUserMenuClose();
+                    navigate('/reports');
+                  }}
+                  sx={{
+                    color: 'rgba(248,250,252,0.9)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.1)'
+                    }
+                  }}
+                >
+                  <ReportIcon sx={{ mr: 1.5, fontSize: 18 }} />
+                  My Reports
+                </MenuItem>
+                <Divider sx={{ borderColor: 'rgba(148,163,184,0.2)' }} />
+                <MenuItem
+                  onClick={handleLogout}
+                  sx={{
+                    color: '#ef4444',
+                    '&:hover': {
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                    }
+                  }}
+                >
+                  Logout
+                </MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <>
+              <Button
+                color="inherit"
+                onClick={() => navigate('/login')}
+                sx={{
+                  mr: 1,
+                  borderRadius: 2,
+                  px: 2,
+                  py: 1,
+                  fontWeight: 600,
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)'
+                  }
+                }}
+              >
+                Login
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/register')}
+                sx={{
+                  borderRadius: 2,
+                  px: 2,
+                  py: 1,
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #4338ca, #6d28d9)'
+                  }
+                }}
+              >
+                Get Started
+              </Button>
+            </>
+          )}
         </Box>
       </Toolbar>
     </AppBar>
   );
 }
 
-function AppRoutes() {
-  // Lazy import to avoid circular dependency
-  const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
-  const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
-  const WebScrapingUpload = React.lazy(() => import('./pages/WebScrapingUpload'));
-  const DataValidationInterface = React.lazy(() => import('./pages/DataValidationInterface'));
-  const ScrapedData = React.lazy(() => import('./pages/MarketSamples'));
-  const Analytics = React.lazy(() => import('./pages/Analytics'));
-  
+// Create a root layout so Nav shows on every page and routes render in Outlet
+function RootLayout() {
   return (
-    <Routes>
-      <Route path="/" element={<Listings />} />
-      <Route path="/browse" element={<Browse />} />
-      <Route path="/listing/:id" element={<ListingDetails />} />
-      <Route path="/add" element={<AddEditListing />} />
-      <Route path="/edit/:id" element={<AddEditListing />} />
-      <Route path="/map" element={<MapPage />} />
-      <Route path="/admin-login" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <AdminLogin />
-        </React.Suspense>
-      } />
-      <Route path="/admin-panel" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <ProtectedAdminRoute>
-            <AdminPanel />
-          </ProtectedAdminRoute>
-        </React.Suspense>
-      } />
-      <Route path="/admin-panel/web-scraping" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <ProtectedAdminRoute>
-            <WebScrapingUpload />
-          </ProtectedAdminRoute>
-        </React.Suspense>
-      } />
-      <Route path="/admin-panel/data-validation" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <ProtectedAdminRoute>
-            <DataValidationInterface />
-          </ProtectedAdminRoute>
-        </React.Suspense>
-      } />
-      <Route path="/admin-panel/scraped-data" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <ProtectedAdminRoute>
-            <ScrapedData />
-          </ProtectedAdminRoute>
-        </React.Suspense>
-      } />
-      <Route path="/admin-panel/analytics" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <ProtectedAdminRoute>
-            <Analytics />
-          </ProtectedAdminRoute>
-        </React.Suspense>
-      } />
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
+    <>
+      <Nav />
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
+        <Outlet />
+      </Box>
+    </>
   );
 }
+
+// Build the router with v7 future flags to opt-in early and silence deprecation warnings
+const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <RootLayout />,
+      children: [
+        { index: true, element: <Listings /> },
+        { path: 'browse', element: <Browse /> },
+        { path: 'listing/:id', element: <ListingDetails /> },
+        { path: 'add', element: <AddEditListing /> },
+        { path: 'edit/:id', element: <AddEditListing /> },
+        { path: 'map', element: <MapPage /> },
+        { path: 'trends', element: <RentalTrends /> },
+  { path: 'compare-areas', element: <CompareAreas /> },
+        { path: 'trends-dashboard', element: <RentTrendsDashboard /> },
+  { path: 'heatmap', element: <RentHeatmap /> },
+        { path: 'login', element: <Login /> },
+        { path: 'register', element: <Register /> },
+        { path: 'admin-login', element: <React.Suspense fallback={<div>Loading...</div>}><AdminLogin /></React.Suspense> },
+        { path: 'admin-panel', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'admin-panel/reports', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><AdminReports /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'admin-panel/web-scraping', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><WebScrapingUpload /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'admin-panel/data-validation', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><DataValidationInterface /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'admin-panel/scraped-data', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><ScrapedData /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'admin-panel/analytics', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><Analytics /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'report-form', element: <ReportForm /> },
+        { path: 'reports', element: <UserReports /> },
+        { path: 'profile', element: <UserProfile /> },
+        { path: '*', element: <Navigate to="/" /> }
+      ]
+    }
+  ],
+  {
+    future: { v7_relativeSplatPath: true, v7_startTransition: true }
+  }
+);
 
 // Protected route component for admin pages
 function ProtectedAdminRoute({ children }) {
@@ -364,12 +597,7 @@ export default function App() {
       <AdminAuthProvider>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <BrowserRouter>
-            <Nav />
-            <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
-              <AppRoutes />
-            </Box>
-          </BrowserRouter>
+          <RouterProvider router={router} future={{ v7_startTransition: true }} />
         </ThemeProvider>
       </AdminAuthProvider>
     </AuthProvider>

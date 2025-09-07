@@ -165,7 +165,7 @@ const WebScrapingUpload = () => {
 
       <Grid container spacing={3}>
         {/* Upload Section */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card elevation={3} sx={{ height: '100%' }}>
             <CardContent>
               <Box sx={{ textAlign: 'center', p: 3 }}>
@@ -231,7 +231,7 @@ const WebScrapingUpload = () => {
         </Grid>
 
         {/* Results Section */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           {uploadResult && (
             <Card elevation={3} sx={{ height: '100%' }}>
               <CardContent>
@@ -252,7 +252,7 @@ const WebScrapingUpload = () => {
                 </Box>
 
                 <Grid container spacing={2} mb={3}>
-                  <Grid item xs={6}>
+                  <Grid xs={6}>
                     <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#e3f2fd' }}>
                       <Typography variant="h5" fontWeight={700} color="primary.main">
                         {uploadResult.totalRecords}
@@ -260,7 +260,7 @@ const WebScrapingUpload = () => {
                       <Typography variant="body2">Total Records</Typography>
                     </Paper>
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid xs={6}>
                     <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#e8f5e8' }}>
                       <Typography variant="h5" fontWeight={700} color="success.main">
                         {uploadResult.validRecords}
@@ -268,7 +268,7 @@ const WebScrapingUpload = () => {
                       <Typography variant="body2">Valid Records</Typography>
                     </Paper>
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid xs={6}>
                     <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#fff3e0' }}>
                       <Typography variant="h5" fontWeight={700} color="warning.main">
                         {uploadResult.invalidRecords}
@@ -276,7 +276,7 @@ const WebScrapingUpload = () => {
                       <Typography variant="body2">Need Review</Typography>
                     </Paper>
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid xs={6}>
                     <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#ffebee' }}>
                       <Typography variant="h5" fontWeight={700} color="error.main">
                         {uploadResult.duplicates}
@@ -385,19 +385,19 @@ const WebScrapingUpload = () => {
                     />
                   </Box>
                   <Grid container spacing={2}>
-                    <Grid item xs={6} sm={3}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                       <Typography variant="caption" color="text.secondary">Type</Typography>
                       <Typography variant="body2">{row.property_type}</Typography>
                     </Grid>
-                    <Grid item xs={6} sm={3}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                       <Typography variant="caption" color="text.secondary">Location</Typography>
                       <Typography variant="body2">{row.area}, {row.district}</Typography>
                     </Grid>
-                    <Grid item xs={6} sm={3}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                       <Typography variant="caption" color="text.secondary">Rent</Typography>
                       <Typography variant="body2">৳{row.rent.toLocaleString()}</Typography>
                     </Grid>
-                    <Grid item xs={6} sm={3}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                       <Typography variant="caption" color="text.secondary">Category</Typography>
                       <Typography variant="body2">{row.rent_category}</Typography>
                     </Grid>

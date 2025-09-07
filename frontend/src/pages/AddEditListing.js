@@ -56,7 +56,13 @@ export default function AddEditListing() {
     if (!id) return;
     (async () => {
       try {
-        const res = await axios.get(`/api/listings/${id}`, { headers: { 'x-user-id': user.id } });
+        const res = await axios.get(`/api/listings/${id}`, { 
+          headers: { 
+            ...(localStorage.getItem('authToken') ? {
+              Authorization: `Bearer ${localStorage.getItem('authToken')}`
+            } : {})
+          } 
+        });
         const data = res.data;
         // Robustly format date to YYYY-MM-DD for the date input
         const toYMD = (val) => {
@@ -278,7 +284,11 @@ export default function AddEditListing() {
     fd.append('existingVideoUrl', videoUrl);
   }
 
-      const headers = { 'x-user-id': user.id };
+      const headers = { 
+        ...(localStorage.getItem('authToken') ? {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`
+        } : {})
+      };
       if (id) await axios.put(`/api/listings/${id}`, fd, { headers });
       else await axios.post('/api/listings', fd, { headers });
   navigate('/map');
@@ -315,11 +325,11 @@ export default function AddEditListing() {
         {tab === 0 && (
           <>
           <Grid container spacing={1.5}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
             <TextField label={<>Title<span className="req-star">*</span></>} name="title" value={form.title} onChange={onChange} fullWidth required />
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth required>
               <InputLabel>Listing Type</InputLabel>
               <Select label="Listing Type" name="type" value={form.type} onChange={onChange}>
@@ -332,22 +342,22 @@ export default function AddEditListing() {
             </FormControl>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
             <TextField type="date" label={<>Available From<span className="req-star">*</span></>} name="availableFrom" value={form.availableFrom} onChange={onChange} fullWidth required InputLabelProps={{ shrink: true }} />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
             <TextField type="number" label={<>Rooms<span className="req-star">*</span></>} name="rooms" inputProps={{ min: 0, step: 1 }} value={form.rooms} onChange={onChange} fullWidth required />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
             <TextField type="number" label="Bathrooms" name="bathrooms" value={form.bathrooms} onChange={onChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
             <TextField type="number" label="Balcony" name="balcony" value={form.balcony} onChange={onChange} fullWidth />
             </Grid>
             <Grid item xs={12} sm={6}>
             <TextField type="number" label="Person Count" name="personCount" value={form.personCount} onChange={onChange} fullWidth />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField label="Features (comma separated)" name="features" value={form.features} onChange={onChange} fullWidth />
             </Grid>
           </Grid>
@@ -359,7 +369,7 @@ export default function AddEditListing() {
 
         {tab === 1 && (
           <Grid container spacing={1.5}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth required>
                 <InputLabel shrink>Division</InputLabel>
                 <Select
@@ -378,7 +388,7 @@ export default function AddEditListing() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth required disabled={!form.division}>
                 <InputLabel shrink>District</InputLabel>
                 <Select
@@ -397,7 +407,7 @@ export default function AddEditListing() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth required disabled={!form.district}>
                 <InputLabel shrink>Subdistrict</InputLabel>
                 <Select
@@ -416,13 +426,13 @@ export default function AddEditListing() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label={<>Area<span className="req-star">*</span></>} name="area" value={form.area || ''} onChange={onChange} fullWidth required />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="Road" name="road" value={form.road || ''} onChange={onChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="House No" name="houseNo" value={form.houseNo || ''} onChange={onChange} fullWidth />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -431,7 +441,7 @@ export default function AddEditListing() {
             <Grid item xs={12} sm={6}>
               <TextField type="number" label="Longitude (Bangladesh)" name="lng" inputProps={{ step: 'any', min: 88.0, max: 92.7 }} value={form.lng} onChange={onChange} fullWidth helperText="Optional, for map marker" />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Button variant="outlined" size="small" onClick={() => setShowPicker(s => !s)}>
                   {showPicker ? 'Hide map picker' : 'Pick on map'}
@@ -442,7 +452,7 @@ export default function AddEditListing() {
               </div>
             </Grid>
             {showPicker && (
-              <Grid item xs={12}>
+              <Grid size={12}>
                 <MapPicker
                   lat={form.lat === '' ? undefined : Number(form.lat)}
                   lng={form.lng === '' ? undefined : Number(form.lng)}
@@ -450,10 +460,10 @@ export default function AddEditListing() {
                 />
               </Grid>
             )}
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField type="number" label="Latitude (Bangladesh)" name="lat" inputProps={{ step: 'any', min: 20.5, max: 26.7 }} value={form.lat} onChange={onChange} fullWidth helperText="Optional, for map marker" />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField type="number" label="Longitude (Bangladesh)" name="lng" inputProps={{ step: 'any', min: 88.0, max: 92.7 }} value={form.lng} onChange={onChange} fullWidth helperText="Optional, for map marker" />
             </Grid>
           </Grid>
@@ -461,7 +471,7 @@ export default function AddEditListing() {
 
         {tab === 2 && (
           <Grid container spacing={1.5}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <b>Photos<span className="req-star">*</span></b>
@@ -543,16 +553,16 @@ export default function AddEditListing() {
 
         {tab === 3 && (
           <Grid container spacing={1.5}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField type="number" label={<>Rent Price<span className="req-star">*</span></>} name="price" inputProps={{ min: 0, step: 1 }} value={form.price} onChange={onChange} fullWidth required />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField type="number" label="Security deposit" name="deposit" inputProps={{ min: 0, step: 1 }} value={form.deposit || ''} onChange={onChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField type="number" label="Service charge" name="serviceCharge" inputProps={{ min: 0, step: 1 }} value={form.serviceCharge || ''} onChange={onChange} fullWidth />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <FormControlLabel control={<Checkbox name="negotiable" checked={!!form.negotiable} onChange={onChange} />} label="Negotiable" />
             </Grid>
           </Grid>

@@ -82,7 +82,9 @@ export default function Browse() {
   const fetch = async () => {
     setLoading(true); setError('');
     try {
-  const res = await axios.get('/api/listings/search', { params: { ...params, ...numericExtendedParams } });
+  const res = await axios.get('/api/listings/search', { 
+    params: { ...params, ...numericExtendedParams }
+  });
       setItems(res.data.data || []);
       setTotal(res.data.total || 0);
     } catch (e) {
