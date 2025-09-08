@@ -81,13 +81,18 @@ const LogoBox = styled(Box)(({ theme }) => ({
 
 export function NavBar() {
   const { user, logout } = useAuth();
-  let admin = null;
-  try { admin = useAdminAuth(); } catch (e) { /* ignore if not present */ }
+  const admin = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const qParam = params.get('q') || '';
   const [searchVal, setSearchVal] = useState(qParam);
+
+  // Navigate to profile if logged in, otherwise to login
+  const switchUser = () => {
+    if (user && user._id) navigate('/profile');
+    else navigate('/login');
+  };
 
   useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
 
@@ -166,7 +171,7 @@ export function NavBar() {
             <AccountCircleIcon />
           </IconButton>
           <Typography variant="body2" sx={{ color: 'rgba(248,250,252,0.9)', ml: 1, display: { xs: 'none', sm: 'block' } }}>
-            {user.name}
+            {user?.name || ''}
           </Typography>
         </Box>
       </Toolbar>
@@ -259,6 +264,13 @@ function AppRoutes() {
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
+}
+
+// Protect admin-only routes
+function ProtectedAdminRoute({ children }) {
+  const admin = useAdminAuth();
+  if (admin.isLoading) return <div>Loading...</div>;
+  return admin.isAdminLoggedIn ? children : <Navigate to="/admin-login" />;
 }
 
 export default function App() {

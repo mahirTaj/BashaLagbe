@@ -48,7 +48,7 @@ const ListingSchema = new mongoose.Schema(
     // Media (store URLs for now; file uploads can map to URLs later)
     photoUrls: { type: [String], default: [] },
     videoUrl: { type: String, default: '' },
-
+   
     // Status
     isRented: { type: Boolean, default: false },
 

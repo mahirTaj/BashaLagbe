@@ -27,7 +27,7 @@ export default function MoveInScheduler() {
   async function book(slotId) {
     try {
       if (!user) return navigate('/login');
-      await axios.post('/api/movein/book', { slotId, tenantName: user.name || 'Tenant' });
+  await axios.post('/api/movein/book', { slotId, tenantName: user?.name || 'Tenant' });
       alert('Booked!');
       fetchSlots();
     } catch (e) { alert(e.response?.data?.error || e.message); }
