@@ -294,7 +294,7 @@ export default function ListingDetails() {
               <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>Landlord Contact</Typography>
               <ContactRow label="Name" value={data.contactName || 'Not provided'} />
               <ContactRow label="Phone" value={data.phone || 'Not provided'} />
-               {/* ✅ Added buttons here */}
+               {/* Added buttons */}
           <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
           <WishlistButton listingId={data._id} />
     <ContactLandlordButton
