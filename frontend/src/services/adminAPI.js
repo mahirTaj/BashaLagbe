@@ -1,24 +1,27 @@
 // Admin API service for web scraping and data validation
-const API_BASE_URL = 'http://localhost:5000/api';
+// Use env var from CRA: REACT_APP_API_BASE_URL (e.g., https://api.example.com)
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL
+  ? `${process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')}/api`
+  : 'http://localhost:5000/api';
 
 class AdminAPI {
   constructor() {
     this.baseURL = `${API_BASE_URL}/admin`;
-    this.adminToken = 'superadmin-token'; // In production, get from secure storage
+  // In dev we may rely on admin-dev flow guarded by env; in prod avoid using header token
+  this.adminToken = localStorage.getItem('adminToken') || '';
   }
 
   getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'admin-token': this.adminToken
-    };
+  const headers = { 'Content-Type': 'application/json' };
+  if (this.adminToken) headers['admin-token'] = this.adminToken;
+  return headers;
   }
 
   getMultipartHeaders() {
-    return {
-      'admin-token': this.adminToken
-      // Don't set Content-Type for multipart/form-data, browser will set it with boundary
-    };
+  const headers = {};
+  if (this.adminToken) headers['admin-token'] = this.adminToken;
+  // Don't set Content-Type for multipart/form-data, browser will set it with boundary
+  return headers;
   }
 
   async uploadScrapedData(csvFile) {
@@ -265,4 +268,5 @@ class AdminAPI {
   }
 }
 
-export default new AdminAPI();
+const adminAPIInstance = new AdminAPI();
+export default adminAPIInstance;

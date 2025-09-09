@@ -8,10 +8,10 @@ export const getAuthHeaders = () => {
   
   if (!token) return {};
   
-  return {
-    Authorization: `Bearer ${token}`,
-    ...(adminToken && !authToken ? { 'admin-token': 'superadmin-token' } : {})
-  };
+  const headers = { Authorization: `Bearer ${token}` };
+  // Only include legacy admin-token header when explicitly set by app flows
+  if (!authToken && adminToken) headers['admin-token'] = adminToken;
+  return headers;
 };
 
 // Check if we have a valid token (not expired)

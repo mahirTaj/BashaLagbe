@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+const DEV_ADMIN_BYPASS = process.env.DEV_ADMIN_BYPASS === 'true';
 
 async function authenticate(req, res, next) {
   try {
@@ -23,11 +24,13 @@ async function authenticate(req, res, next) {
 
 function requireRole(role) {
   return (req, res, next) => {
-    // Dev override: accept simple admin-token header used by admin routes
-    const adminToken = req.headers['admin-token'];
-    if (role === 'admin' && adminToken === 'superadmin-token') {
-      req.auth = req.auth || { userId: 'admin-dev', role: 'admin' };
-      return next();
+    // Dev override: accept simple admin-token header only when enabled via env
+    if (DEV_ADMIN_BYPASS) {
+      const adminToken = req.headers['admin-token'];
+      if (role === 'admin' && adminToken === (process.env.DEV_ADMIN_TOKEN || 'superadmin-token')) {
+        req.auth = req.auth || { userId: 'admin-dev', role: 'admin' };
+        return next();
+      }
     }
 
     if (!req.auth) return res.status(401).json({ error: 'Not authenticated' });

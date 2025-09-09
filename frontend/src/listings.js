@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth';
-import { Box, Button, Chip, CircularProgress, Grid, Stack, ToggleButton, ToggleButtonGroup, Typography, Card, CardContent, CardMedia, CardActions, Paper, TextField, InputAdornment, IconButton, Alert } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Grid, Stack, ToggleButton, ToggleButtonGroup, Typography, Card, CardContent, CardActions, Paper, TextField, InputAdornment, IconButton, Alert } from '@mui/material';
 import { Button as UiButton } from './components/ui/button';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 
 export default function Listings() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -69,9 +69,9 @@ export default function Listings() {
 
   if (!user) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="h5">Please log in to view your listings</Typography>
-        <Button variant="contained" onClick={() => navigate('/login')} sx={{ mt: 2 }}>
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>Please log in to view your listings</Typography>
+        <Button variant="contained" color="primary" onClick={() => navigate('/login')}>
           Login
         </Button>
       </Box>

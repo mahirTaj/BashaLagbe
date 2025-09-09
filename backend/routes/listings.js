@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const MarketSample = require('../models/MarketSample');
 const Report = require('../models/Report');
 const multer = require('multer');
+const cloudinaryLib = require('cloudinary').v2;
 const path = require('path');
 const fs = require('fs');
 const { authenticate, requireRole } = require('../middleware/auth');
@@ -16,17 +17,80 @@ function getUserId(req) {
   return (req.headers['x-user-id'] || req.query.userId || '').toString();
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
-  filename: (req, file, cb) => {
-    const safe = (file.originalname || 'file').replace(/\s+/g, '_');
-    cb(null, `${Date.now()}_${safe}`);
-  },
-});
+// Map common deal type inputs (rent/sale) to schema values 'For Rent' | 'For Sale'
+function mapDealType(input) {
+  if (!input && input !== 0) return null;
+  const raw = input.toString().trim().toLowerCase();
+  if (!raw) return null;
+  const rent = new Set(['rent', 'for rent', 'rental', 'rentals', 'for_rent', 'to let', 'to_let', 'let']);
+  const sale = new Set(['sale', 'sell', 'for sale', 'for_sale', 'selling', 'sellings']);
+  if (rent.has(raw)) return 'For Rent';
+  if (sale.has(raw)) return 'For Sale';
+  // accept already-formatted
+  if (raw === 'for rent') return 'For Rent';
+  if (raw === 'for sale') return 'For Sale';
+  return null;
+}
+
+// Validate if a string is one of the Listing.type categories
+function isListingCategory(value) {
+  const v = (value || '').toString().trim();
+  if (!v) return false;
+  const allowed = new Set(['Apartment', 'Room', 'Sublet', 'Commercial', 'Hostel']);
+  return allowed.has(v) || allowed.has(v.charAt(0).toUpperCase() + v.slice(1).toLowerCase());
+}
+
+// Optional Cloudinary integration (if env configured) for public CDN URLs
+const useCloudinary = Boolean(
+  process.env.CLOUDINARY_URL ||
+  (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+);
+
+if (useCloudinary) {
+  try {
+    if (process.env.CLOUDINARY_URL) {
+      // When CLOUDINARY_URL is set, config() will read from env; secure ensures https URLs
+      cloudinaryLib.config({ secure: true });
+    } else {
+      cloudinaryLib.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure: true,
+      });
+    }
+  } catch (e) {
+    // If misconfigured, fall back to local storage
+    console.error('Cloudinary config error, falling back to local uploads:', e?.message || e);
+  }
+}
+
+const storage = useCloudinary
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
+      filename: (req, file, cb) => {
+        const safe = (file.originalname || 'file').replace(/\s+/g, '_');
+        cb(null, `${Date.now()}_${safe}`);
+      },
+    });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // Helpers to map a stored URL to a local uploads file path and delete safely
 const uploadsDir = path.join(__dirname, '..', 'uploads');
+async function cloudinaryUploadFromBuffer(fileBuffer, originalname, folder) {
+  return new Promise((resolve, reject) => {
+    const publicId = (originalname || 'file').replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
+    const uploadStream = cloudinaryLib.uploader.upload_stream(
+      { resource_type: 'auto', folder, public_id: `${Date.now()}_${publicId}` },
+      (err, result) => {
+        if (err) return reject(err);
+        resolve(result?.secure_url || result?.url);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+}
 function urlToUploadPath(url) {
   if (!url) return null;
   try {
@@ -50,6 +114,32 @@ async function unlinkSafe(filePath) {
   }
 }
 
+// Ensure legacy local URLs (e.g., http://localhost:5000/uploads/...) are rewritten
+// to the current server host so images load in any environment.
+function normalizeLocalUrl(req, url) {
+  if (!url) return url;
+  try {
+    // Only rewrite if it references our static uploads path
+    const marker = '/uploads/';
+    const idx = url.indexOf(marker);
+    if (idx === -1) return url;
+    
+    // Get the current request's protocol and host
+    const protocol = req.protocol || 'http';
+    const host = req.get('host');
+    const pathPart = url.substring(idx); // includes /uploads/...
+    
+    // Return full URL with current protocol and host
+    return `${protocol}://${host}${pathPart}`;
+  } catch {
+    return url;
+  }
+}
+function normalizeLocalUrls(req, urls) {
+  if (!Array.isArray(urls)) return urls;
+  return urls.map((u) => normalizeLocalUrl(req, u));
+}
+
 // Create listing (requires authenticated owner)
 router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
@@ -58,8 +148,20 @@ router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, 
     if (!userId) return res.status(401).json({ error: 'userId required (authenticate or provide x-user-id)' });
 
   const base = `${req.protocol}://${req.get('host')}`;
-  const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-  const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
+  let photoUrls = [];
+  let videoUrl = '';
+  if (useCloudinary) {
+    // Upload to Cloudinary for public access
+    const photos = req.files?.photos || [];
+    photoUrls = await Promise.all(photos.map((f) => cloudinaryUploadFromBuffer(f.buffer, f.originalname, 'basha-lagbe/photos')));
+    if (req.files?.video?.[0]) {
+      videoUrl = await cloudinaryUploadFromBuffer(req.files.video[0].buffer, req.files.video[0].originalname, 'basha-lagbe/videos');
+    }
+  } else {
+    // Local storage fallback (/uploads served statically)
+    photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
+    videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
+  }
 
   // Basic required validations
   const missing = [];
@@ -70,6 +172,7 @@ router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, 
   if (!req.body.district) missing.push('district');
   if (!req.body.subdistrict) missing.push('subdistrict');
   if (!req.body.area) missing.push('area');
+  if (req.body.propertyType === undefined || req.body.propertyType === '') missing.push('propertyType');
   if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
   const floorNum = req.body.floor !== undefined ? Number(req.body.floor) : undefined;
   if (floorNum === undefined || Number.isNaN(floorNum) || floorNum < 0) missing.push('floor');
@@ -185,7 +288,7 @@ router.get('/in-bounds', async (req, res) => {
         type: d.type,
         lat: d.lat ?? d.location?.coordinates?.[1],
         lng: d.lng ?? d.location?.coordinates?.[0],
-        photo: d.photoUrls?.[0] || '',
+        photo: normalizeLocalUrl(req, d.photoUrls?.[0] || ''),
       }))
     );
   } catch (err) {
@@ -224,7 +327,7 @@ router.get('/near', async (req, res) => {
         type: d.type,
         lat: d.lat ?? d.location?.coordinates?.[1],
         lng: d.lng ?? d.location?.coordinates?.[0],
-        photo: d.photoUrls?.[0] || '',
+        photo: normalizeLocalUrl(req, d.photoUrls?.[0] || ''),
       }))
     );
   } catch (err) {
@@ -238,8 +341,13 @@ router.get('/near', async (req, res) => {
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.auth.userId;
-    const listings = await Listing.find({ userId }).sort({ createdAt: -1 });
-    res.json(listings);
+    const listings = await Listing.find({ userId }).sort({ createdAt: -1 }).lean();
+    const normalized = listings.map((d) => ({
+      ...d,
+      photoUrls: normalizeLocalUrls(req, d.photoUrls || []),
+      videoUrl: normalizeLocalUrl(req, d.videoUrl || ''),
+    }));
+    res.json(normalized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -264,6 +372,7 @@ router.get('/search', async (req, res) => {
       division,
       district,
       subdistrict,
+  propertyType,
       area,
       priceMin,
       priceMax,
@@ -303,6 +412,14 @@ router.get('/search', async (req, res) => {
       const types = type.split(',').map(t => t.trim()).filter(Boolean);
       if (types.length === 1) filter.type = types[0];
       else if (types.length > 1) filter.type = { $in: types };
+    }
+
+    // Deal type (rent/sale) mapping to schema field propertyType
+    if (typeof propertyType !== 'undefined' && propertyType !== '') {
+      const mapped = mapDealType(propertyType) || (isListingCategory(propertyType) ? null : propertyType);
+      if (mapped) {
+        filter.propertyType = mapped;
+      }
     }
 
     // Exact location filters (cascading)
@@ -372,12 +489,19 @@ router.get('/search', async (req, res) => {
     const sortOpt = sortMap[sort] || sortMap.newest;
 
     const [data, total] = await Promise.all([
-      Listing.find(filter).sort(sortOpt).skip(skip).limit(limitNum),
+      Listing.find(filter).sort(sortOpt).skip(skip).limit(limitNum).lean(),
       Listing.countDocuments(filter),
     ]);
 
+    // Normalize any legacy local media URLs to the current host
+    const normalized = data.map((d) => ({
+      ...d,
+      photoUrls: normalizeLocalUrls(req, d.photoUrls || []),
+      videoUrl: normalizeLocalUrl(req, d.videoUrl || ''),
+    }));
+
     res.json({
-      data,
+      data: normalized,
       page: pageNum,
       pageSize: data.length,
       limit: limitNum,
@@ -396,9 +520,11 @@ router.get('/:id', async (req, res, next) => {
   try {
     // Only handle valid ObjectId IDs here; otherwise let other routes (e.g., '/reports') match
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return next();
-    const doc = await Listing.findById(req.params.id);
-    if (!doc) return res.status(404).json({ error: 'Not found' });
-    res.json(doc);
+  const doc = await Listing.findById(req.params.id).lean();
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+  doc.photoUrls = normalizeLocalUrls(req, doc.photoUrls || []);
+  doc.videoUrl = normalizeLocalUrl(req, doc.videoUrl || '');
+  res.json(doc);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -414,8 +540,14 @@ router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }
     if (!doc) return res.status(404).json({ error: 'Not found or not owner' });
 
     const base = `${req.protocol}://${req.get('host')}`;
-    const newPhotoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-    const keep = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : doc.photoUrls;
+    let newPhotoUrls = [];
+    if (useCloudinary) {
+      const photos = req.files?.photos || [];
+      newPhotoUrls = await Promise.all(photos.map((f) => cloudinaryUploadFromBuffer(f.buffer, f.originalname, 'basha-lagbe/photos')));
+    } else {
+      newPhotoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
+    }
+    const keep = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : doc.photoUrls || [];
 
   // Track originals to know what to delete later
   const originalPhotoUrls = Array.isArray(doc.photoUrls) ? [...doc.photoUrls] : [];
@@ -470,7 +602,11 @@ router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }
     if (req.files?.video?.[0]) {
       // Replace with newly uploaded video
       removedVideoUrl = originalVideoUrl;
-      doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
+      if (useCloudinary) {
+        doc.videoUrl = await cloudinaryUploadFromBuffer(req.files.video[0].buffer, req.files.video[0].originalname, 'basha-lagbe/videos');
+      } else {
+        doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
+      }
     } else if (req.body.removeVideo === 'true') {
       // Explicitly remove existing video
       removedVideoUrl = originalVideoUrl;
@@ -513,7 +649,10 @@ router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }
     // Fire and forget
     Promise.all(pathsToDelete.map(unlinkSafe)).catch(() => {});
 
-    res.json(updated);
+  const out = updated.toObject ? updated.toObject() : JSON.parse(JSON.stringify(updated));
+  out.photoUrls = normalizeLocalUrls(req, out.photoUrls || []);
+  out.videoUrl = normalizeLocalUrl(req, out.videoUrl || '');
+  res.json(out);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -734,12 +873,16 @@ router.get('/trends/compare', async (req, res) => {
   // Build non-location filters for scraped data
   const match = {};
   match.rent = { ...(match.rent || {}), $gt: 0 };
-    
-    // Numeric filters for MarketSample
-    if (bedroomsMin || bedroomsMax) {
-      match.bedrooms = {};
-      if (bedroomsMin) match.bedrooms.$gte = Number(bedroomsMin);
-      if (bedroomsMax) match.bedrooms.$lte = Number(bedroomsMax);
+
+  // Property type filter
+  if (propertyType) {
+    match.propertyType = { $in: Array.isArray(propertyType) ? propertyType : [propertyType] };
+  }
+  // Numeric filters for MarketSample
+  if (bedroomsMin || bedroomsMax) {
+    match.bedrooms = {};
+    if (bedroomsMin) match.bedrooms.$gte = Number(bedroomsMin);
+    if (bedroomsMax) match.bedrooms.$lte = Number(bedroomsMax);
     }
     // Support exact rooms by mapping `rooms` to min/max when present
     let rMin = roomsMin, rMax = roomsMax;
@@ -837,13 +980,13 @@ router.get('/trends/compare', async (req, res) => {
     // Normalize for Listing.type as schema enum uses capitalized values
     const key = (propertyType || '').toString().trim().toLowerCase();
     const mapListing = {
-      'apartment': 'Apartment', 'appartment': 'Apartment', 'flat': 'Apartment', 'family': 'Apartment',
-      'room': 'Room', 'bachelor': 'Room',
-      'sublet': 'Sublet',
-      'commercial': 'Commercial', 'office': 'Commercial', 'shop': 'Commercial',
-      'hostel': 'Hostel'
+      'for rent': 'For Rent',
+      'for sale': 'For Sale'
     };
-    listingMatch.type = mapListing[key] || propertyType;
+    // map both MarketSample.propertyType and Listing.type to the normalized value
+    const mappedType = mapListing[key] || propertyType;
+    listingMatch.propertyType = mappedType;
+    listingMatch.type = mappedType;
   }
   // Ensure valid price for user listings
   listingMatch.price = { ...(listingMatch.price || {}), $gt: 0 };
@@ -956,8 +1099,8 @@ router.get('/trends/compare', async (req, res) => {
         cur.count += r.count;
       }
     };
-    marketData.forEach(r => addRec(r, 'avgRent'));
-    listingData.forEach(r => addRec(r, 'avgPrice'));
+  marketData.forEach(r => addRec(r, 'avgRent'));
+  listingData.forEach(r => addRec(r, 'avgRent'));
 
     // Transform to grouped object { location: [{period, avgRent, count}], ... }
     const groupedData = {};
@@ -977,173 +1120,7 @@ router.get('/trends/compare', async (req, res) => {
 });
 
 // Get heatmap-ready aggregated data: per-district average rent + centroid (lat/lng)
-router.get('/trends/heatmap', async (req, res) => {
-  try {
-    const { period = 'month', propertyType, minBudget, maxBudget } = req.query;
-
-    // Aggregate avg rent per district from both MarketSample (scraped) and Listing (user data)
-    const dateFormat = period === 'year' ? '%Y' : '%Y-%m';
-
-    // Build match conditions for filters
-    const match = {};
-    if (propertyType) match.propertyType = propertyType;
-    if (minBudget || maxBudget) {
-      match.rent = {};
-      if (minBudget) match.rent.$gte = Number(minBudget);
-      if (maxBudget) match.rent.$lte = Number(maxBudget);
-    }
-
-    // Pipeline for MarketSample
-    const marketPipeline = [
-      { $match: match },
-      {
-        $addFields: {
-          period: { $dateToString: { format: dateFormat, date: '$createdAt' } }
-        }
-      },
-      {
-        $group: {
-          _id: { district: '$district' },
-          avgRent: { $avg: '$rent' },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          district: '$_id.district',
-          avgRent: { $round: ['$avgRent', 0] },
-          count: 1,
-          source: 'scraped',
-          _id: 0
-        }
-      }
-    ];
-
-    // For Listing, use price instead of rent, and type instead of propertyType
-    const listingMatch = {};
-    if (propertyType) listingMatch.type = propertyType;
-    if (minBudget || maxBudget) {
-      listingMatch.price = {};
-      if (minBudget) listingMatch.price.$gte = Number(minBudget);
-      if (maxBudget) listingMatch.price.$lte = Number(maxBudget);
-    }
-
-    // Pipeline for Listing
-    const listingPipeline = [
-      { $match: { ...listingMatch, district: { $exists: true, $ne: '' } } },
-      {
-        $group: {
-          _id: { district: '$district' },
-          avgRent: { $avg: '$price' },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          district: '$_id.district',
-          avgRent: { $round: ['$avgRent', 0] },
-          count: 1,
-          source: 'listings',
-          _id: 0
-        }
-      }
-    ];
-
-    const [marketAgg, listingAgg] = await Promise.all([
-      MarketSample.aggregate(marketPipeline),
-      Listing.aggregate(listingPipeline)
-    ]);
-
-    // Combine results, preferring scraped if both exist
-    const combined = {};
-    marketAgg.forEach(item => {
-      combined[item.district] = item;
-    });
-    listingAgg.forEach(item => {
-      if (!combined[item.district]) {
-        combined[item.district] = item;
-      } else {
-        // Combine counts and average rents
-        const totalCount = combined[item.district].count + item.count;
-        const weightedAvg = (combined[item.district].avgRent * combined[item.district].count + item.avgRent * item.count) / totalCount;
-        combined[item.district].avgRent = Math.round(weightedAvg);
-        combined[item.district].count = totalCount;
-        combined[item.district].source = 'combined';
-      }
-    });
-
-    const agg = Object.values(combined);
-
-    // For each area attempt to compute centroid from Listing documents (which may have lat/lng)
-    const results = [];
-
-    // small fallback map of well-known area/district centroids (approximate)
-    const AREA_COORDS = {
-      'dhanmondi': { lat: 23.7465, lng: 90.3775 },
-      'gulshan': { lat: 23.7929, lng: 90.4145 },
-      'mirpur': { lat: 23.8256, lng: 90.3560 },
-      'uttara': { lat: 23.8739, lng: 90.3790 },
-      'tejgaon': { lat: 23.7542, lng: 90.3984 },
-      'motijheel': { lat: 23.7235, lng: 90.4156 },
-      'kotwali': { lat: 23.7104, lng: 90.4091 },
-      'gazipur': { lat: 23.9996, lng: 90.4066 },
-      'narayanganj': { lat: 23.6236, lng: 90.5000 },
-      'chattogram': { lat: 22.3569, lng: 91.7832 },
-      'rajshahi': { lat: 24.3745, lng: 88.6042 },
-      'khulna': { lat: 22.8456, lng: 89.5403 },
-      'barishal': { lat: 22.7010, lng: 90.3535 },
-      'sylhet': { lat: 24.8949, lng: 91.8687 },
-      'rangpur': { lat: 25.7439, lng: 89.2752 },
-      'mymensingh': { lat: 24.7471, lng: 90.4203 }
-    };
-
-    // Normalize keys helper
-    const norm = (s) => (s || '').toString().trim().toLowerCase();
-
-    for (const row of agg) {
-      const districtName = row.district || 'Unknown';
-      // try to find a few listings with lat/lng in Listing collection
-      const docs = await Listing.find({ district: districtName, $or: [{ lat: { $exists: true } }, { location: { $exists: true } }] })
-        .limit(200)
-        .select('lat lng location')
-        .lean();
-
-      const coords = docs.map((d) => {
-        const lat = (typeof d.lat === 'number') ? d.lat : (d.location && Array.isArray(d.location.coordinates) ? d.location.coordinates[1] : null);
-        const lng = (typeof d.lng === 'number') ? d.lng : (d.location && Array.isArray(d.location.coordinates) ? d.location.coordinates[0] : null);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-        return null;
-      }).filter(Boolean);
-
-      let centroid = null;
-      if (coords.length > 0) {
-        const meanLat = coords.reduce((s, c) => s + c.lat, 0) / coords.length;
-        const meanLng = coords.reduce((s, c) => s + c.lng, 0) / coords.length;
-        centroid = { lat: meanLat, lng: meanLng, samples: coords.length, source: 'listings' };
-      } else {
-        // fallback: try matching district name to known approximate coordinates using fuzzy matching
-        const dkey = norm(districtName);
-        // direct exact key
-        if (AREA_COORDS[dkey]) {
-          centroid = { lat: AREA_COORDS[dkey].lat, lng: AREA_COORDS[dkey].lng, samples: 0, source: 'fallback-district' };
-        } else {
-          // try substring matches: if district name contains a known key or vice versa
-          const foundKey = Object.keys(AREA_COORDS).find((k) => dkey.includes(k) || k.includes(dkey) || dkey.replace(/[^a-z0-9]/g, '').includes(k.replace(/[^a-z0-9]/g, '')));
-          if (foundKey) {
-            centroid = { lat: AREA_COORDS[foundKey].lat, lng: AREA_COORDS[foundKey].lng, samples: 0, source: 'fallback-district-fuzzy' };
-          }
-        }
-      }
-
-      results.push({ district: districtName, avgRent: row.avgRent, count: row.count, centroid });
-    }
-
-    res.json({ success: true, data: results, period });
-  } catch (err) {
-    console.error('Heatmap aggregation error', err);
-    res.status(500).json({ error: 'Failed to fetch heatmap data' });
-  }
-});
+// [Removed] Heatmap endpoint was deprecated and fully removed as per project requirements.
 
 // --------------------------------------------------
 // REPORT LISTINGS ENDPOINTS
@@ -1178,7 +1155,12 @@ router.post(
       }
 
       const base = `${req.protocol}://${req.get('host')}`;
-      const proofUrls = (req.files || []).map((f) => `${base}/uploads/${f.filename}`);
+      let proofUrls = [];
+      if (useCloudinary) {
+        proofUrls = await Promise.all((req.files || []).map((f) => cloudinaryUploadFromBuffer(f.buffer, f.originalname, 'basha-lagbe/reports')));
+      } else {
+        proofUrls = (req.files || []).map((f) => `${base}/uploads/${f.filename}`);
+      }
 
       // Validate report type and target (accept ID or title/name)
       if (reportType === 'listing') {
@@ -1498,7 +1480,12 @@ router.post('/reports', authenticate, upload.array('proof', 5), async (req, res)
 
     // Handle proof files
     const base = `${req.protocol}://${req.get('host')}`;
-    const proofUrls = (req.files || []).map((file) => `${base}/uploads/${file.filename}`);
+    let proofUrls = [];
+    if (useCloudinary) {
+      proofUrls = await Promise.all((req.files || []).map((f) => cloudinaryUploadFromBuffer(f.buffer, f.originalname, 'basha-lagbe/reports')));
+    } else {
+      proofUrls = (req.files || []).map((file) => `${base}/uploads/${file.filename}`);
+    }
 
     // Create the report
     const reportPayload = {

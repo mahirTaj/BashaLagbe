@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server.js",
+    "dev": "nodemon server.js",
+    "start": "node server.js",
     "create:superadmin": "node scripts/createSuperAdmin.js"
   },
   "keywords": [],
@@ -13,10 +14,14 @@
   "description": "",
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^1.41.3",
+    "compression": "^1.7.4",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "frontend": "file:../frontend",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^8.17.1",
     "multer": "^2.0.2",

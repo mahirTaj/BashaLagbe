@@ -36,7 +36,8 @@ const ListingSchema = new mongoose.Schema(
   totalFloors: { type: Number, default: 0 },
   furnishing: { type: String, enum: ['Unfurnished', 'Semi-furnished', 'Furnished'], default: 'Unfurnished' },
   sizeSqft: { type: Number, default: 0 },
-
+  propertyType: { type: String, enum: ['For Rent', 'For Sale'], default: 'For Rent' },
+  
     // Geo (optional lat/lng and GeoJSON point for map)
     lat: { type: Number },
     lng: { type: Number },
@@ -71,6 +72,7 @@ try {
     title: 'text',
     description: 'text',
     area: 'text',
+    propertyType: 'text',
     subdistrict: 'text',
     district: 'text',
     division: 'text',

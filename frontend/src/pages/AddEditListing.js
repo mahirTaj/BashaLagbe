@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../auth';
 import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
-import { Box, Paper, Grid, TextField, Select, MenuItem, FormControl, InputLabel, Button, Typography, Checkbox, FormControlLabel, Chip, Stack, Tabs, Tab } from '@mui/material';
+import { Box, Paper, Grid, TextField, Select, MenuItem, FormControl, InputLabel, Button, Typography, Checkbox, FormControlLabel, Stack, Tabs, Tab } from '@mui/material';
 import MapPicker from '../components/MapPicker';
 
 const empty = {
@@ -12,6 +12,7 @@ const empty = {
   type: 'Apartment',
   price: '',
   availableFrom: '',
+  propertyType: 'For Rent',
   rooms: '',
   bathrooms: '',
   balcony: '',
@@ -80,6 +81,7 @@ export default function AddEditListing() {
           description: data.description || '',
           type: data.type || 'Apartment',
           price: data.price ?? '',
+          propertyType: data.propertyType || '',
           availableFrom: toYMD(data.availableFrom),
           rooms: data.rooms ?? '',
           bathrooms: data.bathrooms ?? '',
@@ -210,6 +212,7 @@ export default function AddEditListing() {
     if (!Number.isFinite(priceNum)) errs.push('Price');
     if (!form.type) errs.push('Listing Type');
     if (!form.availableFrom) errs.push('Available From');
+    if (!form.propertyType) errs.push('Property Type');
     const roomsNum = Number(form.rooms);
     if (!Number.isFinite(roomsNum) || roomsNum < 0) errs.push('Rooms');
     const floorNum = Number(form.floor);
@@ -237,6 +240,7 @@ export default function AddEditListing() {
         bathrooms: String(Number(form.bathrooms || 0)),
         balcony: String(Number(form.balcony || 0)),
         personCount: String(Number(form.personCount || 1)),
+        propertyType: form.propertyType || '',
         features: form.features,
         isRented: String(!!form.isRented),
         division: form.division || '',

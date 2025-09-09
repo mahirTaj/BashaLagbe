@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { createBrowserRouter, RouterProvider, Link, Navigate, useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import Listings from './listings';
 import AddEditListing from './pages/AddEditListing';
 import Browse from './pages/Browse';
 import ListingDetails from './pages/ListingDetails';
+// Removed public Login and Register from routing (admin uses basic login flow)
+import MapPage from './pages/Map';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import MapPage from './pages/Map';
 import { AuthProvider, useAuth } from './auth';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -18,13 +19,12 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
-import { styled, alpha } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ExploreIcon from '@mui/icons-material/Explore';
 import MapIcon from '@mui/icons-material/Map';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ReportIcon from '@mui/icons-material/Report';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -37,7 +37,7 @@ import Analytics from './pages/Analytics';
 import RentalTrends from './pages/RentalTrends';
 import RentTrendsDashboard from './components/RentTrendsDashboard';
 import CompareAreas from './pages/CompareAreas';
-import RentHeatmap from './pages/RentHeatmap';
+// Removed heatmap page
 import UserReports from './pages/UserReports';
 import UserProfile from './pages/UserProfile';
 import ReportForm from './pages/ReportForm';
@@ -115,7 +115,7 @@ const NavButton = styled(Button)(({ theme }) => ({
 
 function Nav() {
   const { user, logout } = useAuth();
-  const { isAdminLoggedIn } = useAdminAuth();
+  const { isAdminLoggedIn, adminLogout } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -124,13 +124,14 @@ function Nav() {
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   // keep input synced when navigating back/forward
-  useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); }, [qParam]);
 
   const handleAdminClick = () => {
-    if (isAdminLoggedIn) {
+    if (user?.role === 'admin' || isAdminLoggedIn) {
       navigate('/admin-panel');
     } else {
-      navigate('/admin-login');
+      navigate('/login');
     }
   };
 
@@ -140,13 +141,7 @@ function Nav() {
     navigate({ pathname: '/browse', search: p.toString() });
   };
 
-  const onFormSubmit = (e) => { e.preventDefault(); submitSearch(); };
-
-  const clearSearch = () => {
-    setSearchVal('');
-    const p = new URLSearchParams(location.search); p.delete('q');
-    navigate({ pathname: '/browse', search: p.toString() });
-  };
+  // onFormSubmit and clearSearch were unused; removed to clear warnings
 
   const handleUserMenuOpen = (event) => {
     setUserMenuAnchor(event.currentTarget);
@@ -159,19 +154,27 @@ function Nav() {
   const handleLogout = () => {
     handleUserMenuClose();
     logout();
+    // Ensure any admin session is also cleared
+    try { adminLogout(); } catch {}
     navigate('/');
   };
 
   const getRoleIcon = (role) => {
-    return role === 'owner' ? <BusinessIcon /> : <PersonIcon />;
+    if (role === 'admin') return <AssessmentIcon />; // or AdminPanelSettings from MUI icons if preferred
+    if (role === 'owner') return <BusinessIcon />;
+    return <PersonIcon />;
   };
 
   const getRoleColor = (role) => {
-    return role === 'owner' ? '#4ade80' : '#60a5fa';
+    if (role === 'admin') return '#f59e0b'; // amber/gold for admin
+    if (role === 'owner') return '#4ade80';
+    return '#60a5fa';
   };
 
   const getRoleLabel = (role) => {
-    return role === 'owner' ? 'Property Owner' : 'Tenant';
+    if (role === 'admin') return 'Admin';
+    if (role === 'owner') return 'Property Owner';
+    return 'Tenant';
   };
 
   return (
@@ -220,10 +223,12 @@ function Nav() {
           <NavButton startIcon={<AssessmentIcon />} onClick={() => navigate('/trends')} data-active={location.pathname.startsWith('/trends')}>
             Trends
           </NavButton>
-          {/* Market Samples link moved into Admin Panel */}
-          <NavButton onClick={handleAdminClick} data-active={location.pathname.startsWith('/admin')} sx={{ ml: 2, fontWeight: 700, color: isAdminLoggedIn ? '#4ade80' : '#facc15', border: `1px solid ${isAdminLoggedIn ? '#4ade80' : '#facc15'}`, borderRadius: 2 }}>
-            {isAdminLoggedIn ? 'Admin Panel' : 'Admin'}
-          </NavButton>
+          {/* Admin panel link: visible only when an admin is logged in */}
+          {(user?.role === 'admin' || isAdminLoggedIn) && (
+            <NavButton onClick={handleAdminClick} data-active={location.pathname.startsWith('/admin')} sx={{ ml: 2, fontWeight: 700, color: '#4ade80', border: '1px solid #4ade80', borderRadius: 2 }}>
+              Admin Panel
+            </NavButton>
+          )}
         </Box>
 
         {/* Search */}
@@ -241,7 +246,7 @@ function Nav() {
           </form>
         </Search>
 
-        {/* User */}
+  {/* User actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
           {user ? (
             <>
@@ -408,40 +413,17 @@ function Nav() {
               </Menu>
             </>
           ) : (
-            <>
+            // Show a single Login button when no user or admin is logged in
+            !isAdminLoggedIn && (
               <Button
-                color="inherit"
+                variant="contained"
+                color="primary"
                 onClick={() => navigate('/login')}
-                sx={{
-                  mr: 1,
-                  borderRadius: 2,
-                  px: 2,
-                  py: 1,
-                  fontWeight: 600,
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)'
-                  }
-                }}
+                sx={{ ml: 1 }}
               >
                 Login
               </Button>
-              <Button
-                variant="contained"
-                onClick={() => navigate('/register')}
-                sx={{
-                  borderRadius: 2,
-                  px: 2,
-                  py: 1,
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #4338ca, #6d28d9)'
-                  }
-                }}
-              >
-                Get Started
-              </Button>
-            </>
+            )
           )}
         </Box>
       </Toolbar>
@@ -476,10 +458,9 @@ const router = createBrowserRouter(
         { path: 'map', element: <MapPage /> },
         { path: 'trends', element: <RentalTrends /> },
   { path: 'compare-areas', element: <CompareAreas /> },
-        { path: 'trends-dashboard', element: <RentTrendsDashboard /> },
-  { path: 'heatmap', element: <RentHeatmap /> },
-        { path: 'login', element: <Login /> },
-        { path: 'register', element: <Register /> },
+  { path: 'trends-dashboard', element: <RentTrendsDashboard /> },
+  { path: 'login', element: <Login /> },
+  { path: 'register', element: <Register /> },
         { path: 'admin-login', element: <React.Suspense fallback={<div>Loading...</div>}><AdminLogin /></React.Suspense> },
         { path: 'admin-panel', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute></React.Suspense> },
         { path: 'admin-panel/reports', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><AdminReports /></ProtectedAdminRoute></React.Suspense> },
@@ -508,7 +489,7 @@ function ProtectedAdminRoute({ children }) {
   }
   
   if (!isAdminLoggedIn) {
-    return <Navigate to="/admin-login" replace />;
+  return <Navigate to="/login" replace />;
   }
   
   return children;
@@ -534,7 +515,7 @@ export default function App() {
       MuiTextField: { defaultProps: { size: 'medium', margin: 'dense' } },
       MuiFormControl: { defaultProps: { size: 'medium', margin: 'dense' } },
       MuiSelect: { defaultProps: { size: 'medium' } },
-      MuiButton: { defaultProps: { size: 'medium' } },
+  // consolidated in styleOverrides below
       MuiToggleButton: {
         defaultProps: { size: 'medium' },
         styleOverrides: {
@@ -561,7 +542,7 @@ export default function App() {
       MuiCheckbox: { defaultProps: { size: 'medium' } },
       MuiIconButton: { defaultProps: { size: 'medium' } },
       MuiButtonBase: { styleOverrides: { root: { fontWeight: 600 } } },
-      MuiButton: {
+  MuiButton: {
         styleOverrides: {
           root: { paddingInline: 20, minHeight: 44, borderRadius: 12, fontWeight: 700 },
           containedPrimary: {
@@ -586,8 +567,7 @@ export default function App() {
       },
       MuiChip: { styleOverrides: { root: { fontSize: '0.75rem', height: 28 } } },
       MuiCard: { styleOverrides: { root: { borderRadius: 16 } } },
-      MuiCardContent: { styleOverrides: { root: { padding: 16, '&:last-child': { paddingBottom: 16 } } } },
-      MuiCardContent: { styleOverrides: { root: { padding: 12, '&:last-child': { paddingBottom: 12 } } } },
+  MuiCardContent: { styleOverrides: { root: { padding: 16, '&:last-child': { paddingBottom: 16 } } } },
       MuiCardActions: { styleOverrides: { root: { padding: '8px 12px' } } },
       MuiToolbar: { defaultProps: { variant: 'dense' } },
     },

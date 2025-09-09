@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
@@ -18,7 +18,7 @@ import { useAuth } from '../auth';
 
 const UserProfile = () => {
   const { user } = useAuth();
-  const [message, setMessage] = useState('');
+  // Removed unused local message state
 
   const getRoleIcon = (role) => {
     return role === 'owner' ? <BusinessIcon /> : <PersonIcon />;
@@ -141,11 +141,7 @@ const UserProfile = () => {
         </Grid>
       </Grid>
 
-      {message && (
-        <Alert severity="success" sx={{ mt: 3 }}>
-          {message}
-        </Alert>
-      )}
+  {/* Success message area removed (no mutable profile actions here) */}
     </Box>
   );
 };
