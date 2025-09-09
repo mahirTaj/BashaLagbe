@@ -4,6 +4,8 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const helmet = require('helmet');
+const compression = require('compression');
 // Load environment variables from .env when present
 try { require('dotenv').config(); } catch (e) {}
 
@@ -13,15 +15,42 @@ const authRoute = require('./routes/auth');
 const trendsRoute = require('./routes/trends');
 
 const app = express();
+const isProd = process.env.NODE_ENV === 'production';
 
+// Trust proxy when behind load balancers/reverse proxies
+if (process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
+// CORS: lock down origins in production via env (comma-separated list)
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const devBypass = process.env.DEV_ADMIN_BYPASS === 'true';
 app.use(cors({
-  origin: true, // Allow all origins for development
+  origin: (origin, callback) => {
+    if (!isProd) return callback(null, true);
+    // allow server-to-server/postman (no origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', ...(devBypass ? ['admin-token'] : [])]
 }));
-app.use(express.json());
 
-// Serve uploaded assets
+// Security & performance
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+}));
+app.use(compression());
+
+// Body parser with sane limits
+app.use(express.json({ limit: '1mb' }));
+
+// Serve uploaded assets (ensure your reverse proxy exposes this path publicly when using local storage)
 const uploadsPath = path.join(__dirname, 'uploads');
 try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
 app.use('/uploads', express.static(uploadsPath));
@@ -40,7 +69,11 @@ app.get('/', (req, res) => {
   });
 });
 
-const mongoURI = process.env.MONGO_URI || 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const mongoURI = process.env.MONGO_URI;
+if (!mongoURI) {
+  console.error('Fatal: MONGO_URI is not set. Please configure environment variables.');
+  process.exit(1);
+}
 
 mongoose.connect(mongoURI)
   .then(() => {
@@ -60,5 +93,27 @@ app.use((err, req, res, next) => {
     return res.status(500).json({ error: err.message || 'Server error' });
   }
   next();
+});
+
+// Optional: serve frontend build when co-hosting (set SERVE_FRONTEND=true)
+try {
+  if (process.env.SERVE_FRONTEND === 'true') {
+    const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
+    if (fs.existsSync(frontendBuild)) {
+      app.use(express.static(frontendBuild));
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api')) return next();
+        res.sendFile(path.join(frontendBuild, 'index.html'));
+      });
+    }
+  }
+} catch {}
+
+// Process-level safety
+process.on('unhandledRejection', (e) => {
+  console.error('Unhandled Rejection:', e);
+});
+process.on('uncaughtException', (e) => {
+  console.error('Uncaught Exception:', e);
 });
 

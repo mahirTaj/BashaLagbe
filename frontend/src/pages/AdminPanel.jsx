@@ -15,19 +15,7 @@ import {
   Paper,
   CircularProgress
 } from '@mui/material';
-import {
-  Dashboard,
-  Report,
-  VerifiedUser,
-  Block,
-  Settings,
-  Logout,
-  TrendingUp,
-  People,
-  Home,
-  Assessment,
-  CloudUpload
-} from '@mui/icons-material';
+import { Report, VerifiedUser, Block, Assessment, CloudUpload, Dashboard, Logout, TrendingUp, People, Home } from '@mui/icons-material';
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -47,9 +35,7 @@ const AdminPanel = () => {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/admin/dashboard/stats', {
-        headers: { 'admin-token': 'superadmin-token' }
-      });
+  const response = await axios.get('/api/admin/dashboard/stats');
       if (response.data.success) {
         setStats(response.data.data);
       }
@@ -123,7 +109,7 @@ const AdminPanel = () => {
 
   const handleLogout = () => {
     adminLogout();
-    navigate('/admin-login');
+  navigate('/login');
   };
 
   return (

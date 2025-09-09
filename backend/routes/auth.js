@@ -6,6 +6,7 @@ const User = require('../models/User');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+const DEV_ADMIN_BYPASS = process.env.DEV_ADMIN_BYPASS === 'true';
 const TOKEN_EXPIRY = '7d';
 
 // Register
@@ -74,8 +75,10 @@ module.exports = router;
 // Returns a signed JWT with role 'admin' when header matches 'superadmin-token'
 router.post('/admin-dev', (req, res) => {
   try {
+    if (!DEV_ADMIN_BYPASS) return res.status(404).json({ error: 'Not found' });
     const adminToken = req.headers['admin-token'];
-    if (adminToken !== 'superadmin-token') {
+    const expected = process.env.DEV_ADMIN_TOKEN || 'superadmin-token';
+    if (adminToken !== expected) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const user = { id: 'admin-dev', name: 'Dev Admin', email: 'admin@local', role: 'admin' };

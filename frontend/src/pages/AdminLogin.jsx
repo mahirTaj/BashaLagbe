@@ -55,11 +55,17 @@ const AdminLogin = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 2
+        p: 2,
+        position: 'relative',
+        overflow: 'hidden',
+        background: [
+          'radial-gradient(1200px 800px at 10% 10%, rgba(124,58,237,0.20), transparent 60%)',
+          'radial-gradient(1000px 600px at 90% 30%, rgba(99,102,241,0.18), transparent 60%)',
+          'linear-gradient(135deg, #0b1020, #121a2e)'
+        ].join(', ')
       }}
     >
       <Container maxWidth="sm">

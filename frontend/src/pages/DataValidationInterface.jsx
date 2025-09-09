@@ -20,9 +20,9 @@ import {
   DialogActions,
   TextField,
   Grid,
-  Alert,
-  Tabs,
-  Tab,
+  // Alert,
+  // Tabs,
+  // Tab,
   Card,
   CardContent,
   FormControl,
@@ -30,32 +30,20 @@ import {
   Select,
   MenuItem,
   Checkbox,
-  FormControlLabel,
+  // FormControlLabel,
   Tooltip,
   LinearProgress,
-  InputAdornment
+  // InputAdornment
 } from '@mui/material';
+// eslint-disable-next-line no-unused-vars
 import SearchIcon from '@mui/icons-material/Search';
+// eslint-disable-next-line no-unused-vars
 import ClearIcon from '@mui/icons-material/Clear';
-import {
-  Edit,
-  Delete,
-  CheckCircle,
-  Error,
-  Warning,
-  Info,
-  Visibility,
-  Save,
-  Cancel,
-  CloudUpload,
-  FilterList,
-  Search,
-  Refresh,
-  DataUsage
-} from '@mui/icons-material';
+// eslint-disable-next-line no-unused-vars
+import { Edit, Delete, CheckCircle, Error, Warning, Info, Visibility, Save, Cancel, CloudUpload, FilterList, Search, Refresh, DataUsage } from '@mui/icons-material';
 
 const DataValidationInterface = () => {
-  const [tabValue, setTabValue] = useState(0);
+  // const [tabValue, setTabValue] = useState(0);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const validationId = queryParams.get('validationId');
@@ -201,6 +189,7 @@ const DataValidationInterface = () => {
     setFilteredData(data);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=> { applyFilters(); }, [validationData, filterStatus]);
 
   // Update statistics whenever validation data changes

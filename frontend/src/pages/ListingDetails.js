@@ -13,8 +13,7 @@ import {
   Stack,
   Button,
   Divider,
-  IconButton,
-  Tooltip
+  IconButton
 } from '@mui/material';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
@@ -23,7 +22,6 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import VideocamIcon from '@mui/icons-material/Videocam';
 // Fact icons
 import HomeWorkIcon from '@mui/icons-material/HomeWork';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import ShowerIcon from '@mui/icons-material/Shower';
 import BalconyIcon from '@mui/icons-material/Balcony';
@@ -34,12 +32,8 @@ import SquareFootIcon from '@mui/icons-material/SquareFoot';
 import WeekendIcon from '@mui/icons-material/Weekend';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import CircleIcon from '@mui/icons-material/Circle';
-import HandshakeIcon from '@mui/icons-material/Handshake';
 import EventAvailableIcon2 from '@mui/icons-material/Event';
-import SavingsIcon from '@mui/icons-material/Savings';
-import PaymentsIcon from '@mui/icons-material/Payments';
 import WifiIcon from '@mui/icons-material/Wifi';
 import LocalParkingIcon from '@mui/icons-material/LocalParking';
 import ElevatorIcon from '@mui/icons-material/AlignVerticalBottom';
@@ -438,14 +432,4 @@ function FeatureBadge({ feature }) {
   );
 }
 
-function RentRow({ icon, label, value, bold }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Box sx={{ color: 'primary.main', display: 'flex' }}>{icon}</Box>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'baseline' }}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{label}:</Typography>
-        <Typography variant={bold ? 'subtitle1' : 'body2'} sx={{ fontWeight: bold ? 800 : 600 }}>{value}</Typography>
-      </Box>
-    </Box>
-  );
-}
+// RentRow helper removed (unused)

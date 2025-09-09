@@ -34,17 +34,9 @@ const upload = multer({
   }
 });
 
-// Admin authentication middleware (simple for now)
-const adminAuth = (req, res, next) => {
-  // In a real app, you'd verify JWT tokens here
-  // For now, we'll just check for a simple header
-  const adminToken = req.headers['admin-token'];
-  if (adminToken === 'superadmin-token') {
-    next();
-  } else {
-    res.status(401).json({ error: 'Unauthorized' });
-  }
-};
+// Admin authentication middleware (use shared JWT auth with admin role)
+const { authenticate, requireRole } = require('../middleware/auth');
+const adminAuth = [authenticate, requireRole('admin')];
 
 // Upload scraped CSV data
 router.post('/upload-scraped-data', adminAuth, upload.single('csvFile'), async (req, res) => {
