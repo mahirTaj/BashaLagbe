@@ -6,9 +6,11 @@
   "main": "index.js",
   "devDependencies": {},
   "scripts": {
-  "test": "echo \"Error: no test specified\" && exit 1",
-  "render-build": "cd frontend && npm ci && npm run build && cd ../backend && npm ci",
-  "start": "cd backend && node server.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npm ci --prefix frontend && npm run build --prefix frontend && npm ci --prefix backend",
+    "render-build": "npm run build",
+    "start": "npm run start --prefix backend",
+    "dev": "npm run dev --prefix frontend & npm run dev --prefix backend"
   },
   "repository": {
     "type": "git",
