@@ -11,6 +11,61 @@ const fs = require('fs');
 const { authenticate, requireRole } = require('../middleware/auth');
 
 // --------------------------------------------------
+// URL rewriting helpers to prevent mixed-content (http assets on https page)
+// --------------------------------------------------
+function effectiveProtocol(req) {
+  if (req.protocol === 'https') return 'https';
+  const xf = req.headers['x-forwarded-proto'];
+  if (xf) return xf.split(',')[0].trim();
+  return req.protocol || 'http';
+}
+function rewriteAssetUrl(req, url) {
+  if (!url || typeof url !== 'string') return url;
+  try {
+    const host = req.get('host');
+    const proto = effectiveProtocol(req);
+    // Convert absolute local uploads URL to relative form to avoid protocol mismatch
+    const localPattern = new RegExp(`^https?:\\/\\/${host}\\/uploads\\/`);
+    if (localPattern.test(url)) {
+      return url.replace(/^https?:\/\/[^/]+/, '').replace(/^\/+/, '/'); // ensure single leading slash
+    }
+    // Force https for same-host http URLs when current request is https
+    if (proto === 'https') {
+      return url.replace(new RegExp(`^http://${host}`), `https://${host}`);
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+function deepRewriteMedia(req, body) {
+  if (!body) return body;
+  if (Array.isArray(body)) return body.map(item => deepRewriteMedia(req, item));
+  if (typeof body === 'object') {
+    if (Array.isArray(body.photoUrls)) {
+      body.photoUrls = body.photoUrls.map(u => rewriteAssetUrl(req, u));
+    }
+    if (body.videoUrl) body.videoUrl = rewriteAssetUrl(req, body.videoUrl);
+    // Recurse shallow nested objects
+    for (const k of Object.keys(body)) {
+      const v = body[k];
+      if (v && typeof v === 'object') deepRewriteMedia(req, v);
+    }
+  }
+  return body;
+}
+
+// Patch res.json within this router to sanitize media URLs before sending to client
+router.use((req, res, next) => {
+  const orig = res.json;
+  res.json = function (data) {
+    try { data = deepRewriteMedia(req, data); } catch {}
+    return orig.call(this, data);
+  };
+  next();
+});
+
+// --------------------------------------------------
 // Helpers & upload config
 // --------------------------------------------------
 function getUserId(req) {

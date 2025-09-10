@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -43,6 +44,10 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      if (DEBUG_AUTH) console.error('[auth] Mongo not ready. state=', mongoose.connection.readyState);
+      return res.status(503).json({ error: 'Database not ready' });
+    }
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
     const user = await User.findOne({ email });
