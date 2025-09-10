@@ -13,6 +13,9 @@ const listingsRoute = require('./routes/listings');
 const adminRoute = require('./routes/admin');
 const authRoute = require('./routes/auth');
 const trendsRoute = require('./routes/trends');
+const { validateEnv } = require('./config/validateEnv');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
@@ -47,6 +50,21 @@ app.use(helmet({
 }));
 app.use(compression());
 
+// Logging (skip in test environments)
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan(isProd ? 'combined' : 'dev'));
+}
+
+// Basic rate limiting on API in production
+if (isProd) {
+  app.use('/api/', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false
+  }));
+}
+
 // Body parser with sane limits
 app.use(express.json({ limit: '1mb' }));
 
@@ -60,6 +78,23 @@ app.use('/api/admin', adminRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/trends', trendsRoute);
 
+// Root route tries to serve SPA if available even before wildcard fallback
+app.get('/', (req, res, next) => {
+  if (process.env.SERVE_FRONTEND === 'true') {
+    const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
+    const indexPath = path.join(frontendBuild, 'index.html');
+    if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+  }
+  // Fallback JSON if frontend not being served
+  return res.json({
+    ok: true,
+    service: 'BashaLagbe backend',
+    note: 'SPA build not served at /. Ensure SERVE_FRONTEND=true and build succeeded.',
+    health: '/api/health',
+    endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
+  });
+});
+
 // Health/status endpoint (moved off root so SPA can mount at '/')
 app.get('/api/health', (req, res) => {
   res.json({
@@ -69,11 +104,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Validate env BEFORE connecting
+try { validateEnv(); } catch (e) { process.exit(1); }
 const mongoURI = process.env.MONGO_URI;
-if (!mongoURI) {
-  console.error('Fatal: MONGO_URI is not set. Please configure environment variables.');
-  process.exit(1);
-}
 
 mongoose.connect(mongoURI)
   .then(() => {
@@ -95,23 +128,32 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// 404 handler for API routes (after all API endpoints, before SPA fallback)
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next(); // health already defined
+  return res.status(404).json({ error: 'Not Found' });
+});
+
 // Optional: serve frontend build when co-hosting (set SERVE_FRONTEND=true)
 try {
   if (process.env.SERVE_FRONTEND === 'true') {
     const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
     if (fs.existsSync(frontendBuild)) {
+      console.log('[startup] Serving frontend build from', frontendBuild);
       app.use(express.static(frontendBuild));
-      // SPA fallback (after API & health routes)
+      // Wildcard SPA fallback (after explicit API & health routes)
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api')) return next();
-        res.sendFile(path.join(frontendBuild, 'index.html'));
+        return res.sendFile(path.join(frontendBuild, 'index.html'));
       });
     } else {
-      console.warn('SERVE_FRONTEND=true but build folder not found:', frontendBuild);
+      console.warn('[startup] SERVE_FRONTEND=true but build folder missing:', frontendBuild);
     }
+  } else {
+    console.log('[startup] SERVE_FRONTEND not enabled; backend API only.');
   }
 } catch (e) {
-  console.warn('Error setting up frontend serving:', e.message);
+  console.warn('[startup] Error setting up frontend serving:', e.message);
 }
 
 // Process-level safety
