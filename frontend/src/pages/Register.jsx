@@ -108,6 +108,7 @@ export default function Register() {
               <TextField
                 fullWidth
                 label="Name"
+                autoComplete="name"
                 sx={{ mb: 2.5 }}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -122,6 +123,8 @@ export default function Register() {
               <TextField
                 fullWidth
                 label="Email"
+                type="email"
+                autoComplete="email"
                 sx={{ mb: 2.5 }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -137,6 +140,7 @@ export default function Register() {
                 fullWidth
                 label="Password"
                 type="password"
+                autoComplete="new-password"
                 sx={{ mb: 2.5 }}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

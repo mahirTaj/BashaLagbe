@@ -30,7 +30,13 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (e) {
     console.error('Register error', e);
-    res.status(500).json({ error: 'Server error' });
+    const base = { error: 'Server error' };
+    if (process.env.NODE_ENV !== 'production' || DEBUG_AUTH) {
+      base.details = e.message;
+      base.phase = 'register';
+      if (!process.env.JWT_SECRET) base.hint = 'Set JWT_SECRET in environment';
+    }
+    res.status(500).json(base);
   }
 });
 
@@ -41,10 +47,32 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    // Backward compatibility / auto-migration: older records may have `password` instead of `passwordHash`
     if (!user.passwordHash) {
-      if (DEBUG_AUTH) console.error('Login error: user record missing passwordHash field', { userId: user._id });
-      return res.status(500).json({ error: 'Account data invalid. Contact support.' });
+      const legacy = user.password; // may exist from older schema
+      if (legacy) {
+        const isBcrypt = /^\$2[aby]\$/.test(legacy);
+        try {
+          if (isBcrypt) {
+            // Treat as already-hashed password
+            user.passwordHash = legacy;
+          } else {
+            // Hash the plaintext legacy password now
+            const salt = await bcrypt.genSalt(10);
+            user.passwordHash = await bcrypt.hash(legacy, salt);
+          }
+          await user.save();
+          if (DEBUG_AUTH) console.log('[auth] Migrated legacy password -> passwordHash for user', user._id.toString());
+        } catch (mErr) {
+          if (DEBUG_AUTH) console.error('[auth] Legacy password migration failed', { userId: user._id, error: mErr.message });
+          return res.status(500).json({ error: 'Account upgrade failed. Contact support.' });
+        }
+      } else {
+        if (DEBUG_AUTH) console.error('Login error: user record missing passwordHash field', { userId: user._id });
+        return res.status(500).json({ error: 'Account data invalid. Contact support.' });
+      }
     }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 

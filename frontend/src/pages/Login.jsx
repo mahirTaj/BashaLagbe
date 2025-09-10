@@ -130,6 +130,8 @@ export default function Login() {
                 type="email"
                 required
                 autoComplete="email"
+                inputProps={{ autoComplete: 'email' }}
+                name="email"
                 sx={{ mb: 2.5 }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -155,6 +157,8 @@ export default function Login() {
                 type={showPassword ? 'text' : 'password'}
                 required
                 autoComplete="current-password"
+                inputProps={{ autoComplete: 'current-password' }}
+                name="password"
                 sx={{ mb: 3 }}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

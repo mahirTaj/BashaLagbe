@@ -47,27 +47,31 @@ app.use(cors({
 // Security & performance
 // Allow overriding CSP (e.g. temporary during debugging) with DISABLE_CSP=true
 const disableCSP = process.env.DISABLE_CSP === 'true';
+const extraImg = (process.env.CSP_IMG_EXTRA || '').split(',').map(s=>s.trim()).filter(Boolean);
+const extraConnect = (process.env.ALLOW_CONNECT_EXTRA || '').split(',').map(s=>s.trim()).filter(Boolean);
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+  fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+  imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', ...extraImg],
+  mediaSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https://*.cloudinary.com'],
+  connectSrc: ["'self'", 'https://res.cloudinary.com', ...extraConnect],
+  objectSrc: ["'none'"],
+  frameSrc: ["'none'"],
+  workerSrc: ["'self'", 'blob:'],
+  baseUri: ["'self'"],
+  formAction: ["'self'"],
+};
+if (disableCSP) {
+  console.warn('[security] CSP disabled via DISABLE_CSP=true');
+} else {
+  console.log('[security] CSP enabled. imgSrc:', cspDirectives.imgSrc.join(' '));
+}
 app.use(helmet({
   crossOriginResourcePolicy: false,
   // Only apply a custom CSP in production (or when not disabled) to prevent blocking Cloudinary images
-  contentSecurityPolicy: disableCSP ? false : {
-    useDefaults: false,
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-      // Permit Cloudinary, data/blobs, and general https (for potential map tiles or CDN) – tighten later if desired
-      imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https://*.cloudinary.com', 'https:'],
-      mediaSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https://*.cloudinary.com'],
-      connectSrc: ["'self'", 'https://res.cloudinary.com', ...(process.env.ALLOW_CONNECT_EXTRA ? process.env.ALLOW_CONNECT_EXTRA.split(',').map(s=>s.trim()).filter(Boolean) : [])],
-      objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
-      workerSrc: ["'self'", 'blob:'],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-    }
-  }
+  contentSecurityPolicy: disableCSP ? false : { useDefaults: false, directives: cspDirectives }
 }));
 app.use(compression());
 
@@ -100,6 +104,23 @@ app.get('/api/health', (req, res) => {
     ok: true,
     service: 'BashaLagbe backend',
     endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
+  });
+});
+
+// Debug configuration (non-sensitive) - DO NOT expose secrets
+app.get('/api/debug/config', (req, res) => {
+  res.json({
+    node: process.version,
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      SERVE_FRONTEND: process.env.SERVE_FRONTEND,
+      DISABLE_CSP: process.env.DISABLE_CSP,
+      TRUST_PROXY: process.env.TRUST_PROXY,
+      DEBUG_AUTH: process.env.DEBUG_AUTH,
+    },
+    cspDisabled: disableCSP,
+    cspImgSrc: disableCSP ? 'disabled' : cspDirectives.imgSrc,
+    cspConnectSrc: disableCSP ? 'disabled' : cspDirectives.connectSrc,
   });
 });
 
