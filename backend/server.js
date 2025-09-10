@@ -73,29 +73,7 @@ const uploadsPath = path.join(__dirname, 'uploads');
 try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
 app.use('/uploads', express.static(uploadsPath));
 
-app.use('/api/listings', listingsRoute);
-app.use('/api/admin', adminRoute);
-app.use('/api/auth', authRoute);
-app.use('/api/trends', trendsRoute);
-
-// Root route tries to serve SPA if available even before wildcard fallback
-app.get('/', (req, res, next) => {
-  if (process.env.SERVE_FRONTEND === 'true') {
-    const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
-    const indexPath = path.join(frontendBuild, 'index.html');
-    if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
-  }
-  // Fallback JSON if frontend not being served
-  return res.json({
-    ok: true,
-    service: 'BashaLagbe backend',
-    note: 'SPA build not served at /. Ensure SERVE_FRONTEND=true and build succeeded.',
-    health: '/api/health',
-    endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
-  });
-});
-
-// Health/status endpoint (moved off root so SPA can mount at '/')
+// Health/status endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
@@ -104,20 +82,59 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Validate env BEFORE connecting
-try { validateEnv(); } catch (e) { process.exit(1); }
-const mongoURI = process.env.MONGO_URI;
+// API routes
+app.use('/api/auth', authRoute);
+app.use('/api/listings', listingsRoute);
+app.use('/api/admin', adminRoute);
+app.use('/api/trends', trendsRoute);
 
-mongoose.connect(mongoURI)
-  .then(() => {
-    console.log('MongoDB connected');
-  const port = process.env.PORT || 5000;
-  app.listen(port, () => console.log('Server running on port', port));
-  })
-  .catch(err => console.error(err));
+// 404 handler for unknown API routes
+app.use('/api*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
 
-// Global error handler to make upload errors readable in the client
-// eslint-disable-next-line no-unused-vars
+// Serve frontend build and handle SPA routing
+if (process.env.SERVE_FRONTEND === 'true') {
+  const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
+  
+  if (fs.existsSync(frontendBuild)) {
+    console.log('[startup] Serving frontend build from:', frontendBuild);
+    
+    // Serve static files (JS, CSS, images, etc.)
+    app.use(express.static(frontendBuild, {
+      maxAge: '1d', // Cache static assets for 1 day
+      etag: false
+    }));
+    
+    // SPA fallback - serve index.html for all non-API routes
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(frontendBuild, 'index.html'));
+    });
+  } else {
+    console.warn('[startup] SERVE_FRONTEND=true but build folder missing:', frontendBuild);
+    
+    // Fallback when build folder doesn't exist
+    app.get('*', (req, res) => {
+      res.status(503).json({
+        error: 'Frontend build not found',
+        message: 'Run npm run build to create the frontend build'
+      });
+    });
+  }
+} else {
+  console.log('[startup] SERVE_FRONTEND not enabled; API-only mode');
+  
+  // API-only mode - return service info at root
+  app.get('/', (req, res) => {
+    res.json({
+      ok: true,
+      service: 'BashaLagbe backend API',
+      endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
+    });
+  });
+}
+
+// Global error handler
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
@@ -128,33 +145,20 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// 404 handler for API routes (after all API endpoints, before SPA fallback)
-app.use('/api', (req, res, next) => {
-  if (req.path === '/health') return next(); // health already defined
-  return res.status(404).json({ error: 'Not Found' });
-});
+// Validate env BEFORE connecting
+try { validateEnv(); } catch (e) { process.exit(1); }
+const mongoURI = process.env.MONGO_URI;
 
-// Optional: serve frontend build when co-hosting (set SERVE_FRONTEND=true)
-try {
-  if (process.env.SERVE_FRONTEND === 'true') {
-    const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
-    if (fs.existsSync(frontendBuild)) {
-      console.log('[startup] Serving frontend build from', frontendBuild);
-      app.use(express.static(frontendBuild));
-      // Wildcard SPA fallback (after explicit API & health routes)
-      app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api')) return next();
-        return res.sendFile(path.join(frontendBuild, 'index.html'));
-      });
-    } else {
-      console.warn('[startup] SERVE_FRONTEND=true but build folder missing:', frontendBuild);
-    }
-  } else {
-    console.log('[startup] SERVE_FRONTEND not enabled; backend API only.');
-  }
-} catch (e) {
-  console.warn('[startup] Error setting up frontend serving:', e.message);
-}
+mongoose.connect(mongoURI)
+  .then(() => {
+    console.log('MongoDB connected');
+    const port = process.env.PORT || 5000;
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`Server running on port ${port}`);
+      console.log(`Health check: http://localhost:${port}/api/health`);
+    });
+  })
+  .catch(err => console.error(err));
 
 // Process-level safety
 process.on('unhandledRejection', (e) => {
