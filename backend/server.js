@@ -6,6 +6,8 @@ const multer = require('multer');
 const fs = require('fs');
 const helmet = require('helmet');
 const compression = require('compression');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 // Load environment variables from .env when present
 try { require('dotenv').config(); } catch (e) {}
 
@@ -44,8 +46,23 @@ app.use(cors({
 // Security & performance
 app.use(helmet({
   crossOriginResourcePolicy: false,
+  contentSecurityPolicy: false // can be refined later if needed
 }));
 app.use(compression());
+
+// Basic request logging (skip in test env)
+if (!process.env.DISABLE_REQUEST_LOGS && process.env.NODE_ENV !== 'test') {
+  app.use(morgan(isProd ? 'combined' : 'dev'));
+}
+
+// Basic rate limiting for auth & admin sensitive endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 200,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(['/api/auth', '/api/admin'], authLimiter);
 
 // Body parser with sane limits
 app.use(express.json({ limit: '1mb' }));
@@ -75,13 +92,17 @@ if (!mongoURI) {
   process.exit(1);
 }
 
+let server;
 mongoose.connect(mongoURI)
   .then(() => {
     console.log('MongoDB connected');
-  const port = process.env.PORT || 5000;
-  app.listen(port, () => console.log('Server running on port', port));
+    const port = process.env.PORT || 5000;
+    server = app.listen(port, () => console.log('Server running on port', port));
   })
-  .catch(err => console.error(err));
+  .catch(err => {
+    console.error('Mongo connection error:', err);
+    process.exit(1);
+  });
 
 // Global error handler to make upload errors readable in the client
 // eslint-disable-next-line no-unused-vars
@@ -116,4 +137,22 @@ process.on('unhandledRejection', (e) => {
 process.on('uncaughtException', (e) => {
   console.error('Uncaught Exception:', e);
 });
+
+// Graceful shutdown
+const shutdown = (signal) => {
+  console.log(`Received ${signal}. Closing gracefully...`);
+  if (server) {
+    server.close(() => {
+      console.log('HTTP server closed');
+      mongoose.connection.close(false, () => {
+        console.log('Mongo connection closed');
+        process.exit(0);
+      });
+    });
+  } else {
+    process.exit(0);
+  }
+};
+['SIGTERM','SIGINT'].forEach(sig => process.on(sig, () => shutdown(sig)));
+
 
