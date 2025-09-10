@@ -127,6 +127,9 @@ export default function Login() {
               <TextField
                 fullWidth
                 label="Email"
+                type="email"
+                required
+                autoComplete="email"
                 sx={{ mb: 2.5 }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -150,6 +153,8 @@ export default function Login() {
                 fullWidth
                 label="Password"
                 type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
                 sx={{ mb: 3 }}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

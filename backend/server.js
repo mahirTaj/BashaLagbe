@@ -45,8 +45,29 @@ app.use(cors({
 }));
 
 // Security & performance
+// Allow overriding CSP (e.g. temporary during debugging) with DISABLE_CSP=true
+const disableCSP = process.env.DISABLE_CSP === 'true';
 app.use(helmet({
   crossOriginResourcePolicy: false,
+  // Only apply a custom CSP in production (or when not disabled) to prevent blocking Cloudinary images
+  contentSecurityPolicy: disableCSP ? false : {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      // Permit Cloudinary, data/blobs, and general https (for potential map tiles or CDN) – tighten later if desired
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https://*.cloudinary.com', 'https:'],
+      mediaSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https://*.cloudinary.com'],
+      connectSrc: ["'self'", 'https://res.cloudinary.com', ...(process.env.ALLOW_CONNECT_EXTRA ? process.env.ALLOW_CONNECT_EXTRA.split(',').map(s=>s.trim()).filter(Boolean) : [])],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+      workerSrc: ["'self'", 'blob:'],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    }
+  }
 }));
 app.use(compression());
 

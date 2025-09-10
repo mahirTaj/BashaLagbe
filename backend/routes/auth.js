@@ -6,6 +6,7 @@ const User = require('../models/User');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+const DEBUG_AUTH = process.env.DEBUG_AUTH === 'true';
 const DEV_ADMIN_BYPASS = process.env.DEV_ADMIN_BYPASS === 'true';
 const TOKEN_EXPIRY = '7d';
 
@@ -40,6 +41,10 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user.passwordHash) {
+      if (DEBUG_AUTH) console.error('Login error: user record missing passwordHash field', { userId: user._id });
+      return res.status(500).json({ error: 'Account data invalid. Contact support.' });
+    }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
@@ -47,7 +52,13 @@ router.post('/login', async (req, res) => {
     res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (e) {
     console.error('Login error', e);
-    res.status(500).json({ error: 'Server error' });
+    const base = { error: 'Server error' };
+    if (process.env.NODE_ENV !== 'production' || DEBUG_AUTH) {
+      base.details = e.message;
+      if (!process.env.JWT_SECRET) base.hint = 'Set JWT_SECRET in environment';
+      base.phase = 'login';
+    }
+    res.status(500).json(base);
   }
 });
 
