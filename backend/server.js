@@ -60,8 +60,8 @@ app.use('/api/admin', adminRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/trends', trendsRoute);
 
-// Root health/status endpoint
-app.get('/', (req, res) => {
+// Health/status endpoint (moved off root so SPA can mount at '/')
+app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     service: 'BashaLagbe backend',
@@ -101,13 +101,18 @@ try {
     const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
     if (fs.existsSync(frontendBuild)) {
       app.use(express.static(frontendBuild));
+      // SPA fallback (after API & health routes)
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api')) return next();
         res.sendFile(path.join(frontendBuild, 'index.html'));
       });
+    } else {
+      console.warn('SERVE_FRONTEND=true but build folder not found:', frontendBuild);
     }
   }
-} catch {}
+} catch (e) {
+  console.warn('Error setting up frontend serving:', e.message);
+}
 
 // Process-level safety
 process.on('unhandledRejection', (e) => {
