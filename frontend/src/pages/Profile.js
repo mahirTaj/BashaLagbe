@@ -63,22 +63,40 @@ export default function Profile() {
     e.preventDefault();
     let updatedForm = { ...form };
 
+    // If nothing changed, show a message instead of submitting
+    if (!editing && !profilePicFile) {
+      setMessage('No changes to save. Make edits to enable updating.');
+      return;
+    }
+
     try {
       // Handle profile picture upload
       if (profilePicFile) {
         const picData = new FormData();
         picData.append('profilePic', profilePicFile);
         const picRes = await axios.post('/api/auth/upload-profile-pic', picData);
+        // eslint-disable-next-line no-console
+        console.debug('profile pic upload response', picRes?.data);
         updatedForm.profilePic = picRes.data.url;
       }
 
+      // Debug: show payload about to be sent
+      // eslint-disable-next-line no-console
+      console.debug('Submitting profile update payload', updatedForm);
+
       const res = await axios.put('/api/auth/profile', updatedForm);
+      // eslint-disable-next-line no-console
+      console.debug('profile update response', res?.data);
+      // Update local user and refresh global auth context if available
+      if (auth && auth.refreshProfile) {
+        try { await auth.refreshProfile(); } catch (e) { /* ignore */ }
+      }
       setUser(res.data);
       setForm({
         ...form,
         profilePic: res.data.profilePic // update the preview immediately
       });
-      setMessage('Profile updated!');
+        setMessage('Profile updated!');
       setEditing(false);
     } catch (err) {
       setMessage('Update failed.');
@@ -142,7 +160,9 @@ export default function Profile() {
           <input type="file" accept="image/*" onChange={handlePicChange} />
         </label>
         <br />
-        <button type="submit" disabled={!editing}>Update Profile</button>
+        <button type="submit" style={{ padding: '8px 16px', backgroundColor: '#1976d2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+          Update Profile
+        </button>
       </form>
       {message && <div>{message}</div>}
 
@@ -158,7 +178,7 @@ export default function Profile() {
           <input type="password" name="newPassword" value={passwords.newPassword} onChange={handlePasswordChange} />
         </label>
         <br />
-        <button type="submit">Change Password</button>
+  <button type="submit" style={{ padding: '8px 16px', backgroundColor: '#1976d2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Change Password</button>
       </form>
       {pwMessage && <div>{pwMessage}</div>}
 

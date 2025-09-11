@@ -62,6 +62,22 @@ export function AuthProvider({ children }) {
     setAuthHeader(t);
   };
 
+  // Allow callers to explicitly refresh the profile from the API and update context
+  const refreshProfile = async () => {
+    try {
+      const prof = await axios.get('/api/auth/profile');
+      const u = prof.data;
+      if (u && u._id && !u.id) u.id = u._id;
+      setUser(u);
+      return u;
+    } catch (err) {
+      // keep existing user if fetch fails but log for debugging
+      // eslint-disable-next-line no-console
+      console.error('[Auth] refreshProfile failed', err?.response?.data || err.message);
+      throw err;
+    }
+  };
+
   const login = async (email, password) => {
     const res = await axios.post('/api/auth/login', { email, password });
     const t = res.data.token;
@@ -100,7 +116,7 @@ export function AuthProvider({ children }) {
   };
 
   // expose a method to set token programmatically (used by OAuth redirect handler)
-  return <AuthCtx.Provider value={{ user, loading, token, login, register, logout, setAuthToken: saveToken }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, loading, token, login, register, logout, setAuthToken: saveToken, refreshProfile }}>{children}</AuthCtx.Provider>;
 }
 
 export function useAuth() {

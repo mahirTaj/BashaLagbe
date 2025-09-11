@@ -27,6 +27,7 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import ExploreIcon from '@mui/icons-material/Explore';
 import MapIcon from '@mui/icons-material/Map';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import Avatar from '@mui/material/Avatar';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 
@@ -168,7 +169,11 @@ export function NavBar() {
         {/* User */}
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
           <IconButton onClick={switchUser} sx={{ color: '#e5e7eb', '&:hover': { color: '#fff' } }} aria-label="account">
-            <AccountCircleIcon />
+            {user?.profilePic ? (
+              <Avatar src={user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:5000${user.profilePic}`} sx={{ width: 34, height: 34 }} />
+            ) : (
+              <AccountCircleIcon />
+            )}
           </IconButton>
           <Typography variant="body2" sx={{ color: 'rgba(248,250,252,0.9)', ml: 1, display: { xs: 'none', sm: 'block' } }}>
             {user?.name || ''}

@@ -86,17 +86,29 @@ exports.getProfile = async (req, res) => {
 // Update user profile
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user && (req.user.id || req.user._id) ? (req.user.id || req.user._id) : null;
     const { name, contact, preferences, profilePic } = req.body;
-    // Find user and update fields
+
+    // Debug: log incoming update for troubleshooting (server-side only)
+    // eslint-disable-next-line no-console
+    console.debug('[authController] updateProfile called for userId=', userId, 'body=', { name, contact, preferences, profilePic });
+
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    // Find user and update fields; runValidators ensures schema validation on updates
     const user = await User.findByIdAndUpdate(
       userId,
       { name, contact, preferences, profilePic },
-      { new: true }
+      { new: true, runValidators: true }
     );
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
     res.json(user);
   } catch (err) {
-    res.status(400).json({ error: 'Profile update failed.' });
+    // eslint-disable-next-line no-console
+    console.error('[authController] updateProfile error', err?.message || err);
+    res.status(400).json({ error: 'Profile update failed.', details: err?.message });
   }
 };
 
