@@ -220,10 +220,22 @@ function Nav() {
           <NavButton startIcon={<AssessmentIcon />} onClick={() => navigate('/trends')} data-active={location.pathname.startsWith('/trends')}>
             Trends
           </NavButton>
-          {/* Market Samples link moved into Admin Panel */}
-          <NavButton onClick={handleAdminClick} data-active={location.pathname.startsWith('/admin')} sx={{ ml: 2, fontWeight: 700, color: isAdminLoggedIn ? '#4ade80' : '#facc15', border: `1px solid ${isAdminLoggedIn ? '#4ade80' : '#facc15'}`, borderRadius: 2 }}>
-            {isAdminLoggedIn ? 'Admin Panel' : 'Admin'}
-          </NavButton>
+          {/* Admin button, visible only to admin users */}
+          {user && user.role === 'admin' && (
+            <NavButton 
+              onClick={() => navigate('/admin-panel')} 
+              data-active={location.pathname.startsWith('/admin')} 
+              sx={{ 
+                ml: 2, 
+                fontWeight: 700, 
+                color: '#4ade80', 
+                border: `1px solid #4ade80`, 
+                borderRadius: 2 
+              }}
+            >
+              Admin Panel
+            </NavButton>
+          )}
         </Box>
 
         {/* Search */}

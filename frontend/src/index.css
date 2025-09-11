@@ -158,3 +158,24 @@ input[type="checkbox"], input[type="radio"] { width: auto; padding: 0; border: n
 .segmented .seg.active { background: linear-gradient(135deg,#4f46e5,#6366f1 55%,#7c3aed); color: #f8fafc; border: 1px solid rgba(99,102,241,.5); box-shadow: 0 8px 18px rgba(79,70,229,.28); }
 
 .inline-field { display: inline-flex; align-items: center; gap: 10px; }
+
+/* Responsive styles for Navbar */
+@media (max-width: 768px) {
+  .MuiToolbar-root {
+    flex-wrap: wrap;
+  }
+
+  /* Hide navigation buttons on small screens */
+  .MuiBox-root > .MuiButton-root {
+    display: none;
+  }
+
+  /* Ensure search and user sections are visible */
+  .MuiBox-root > .MuiButton-root[data-testid="admin-button"],
+  .MuiBox-root > .MuiButton-root[data-testid="login-button"],
+  .MuiBox-root > .MuiButton-root[data-testid="get-started-button"] {
+    display: flex;
+  }
+  
+  /* You can add a hamburger menu icon here and toggle a drawer/modal with the nav links */
+}

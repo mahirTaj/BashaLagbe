@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Listing = require('../models/listings');
-const MarketSample = require('../models/MarketSample');
 
 // Fallback: redirect compare calls here to the canonical listings compare endpoint
 router.get('/compare', async (req, res) => {
@@ -15,7 +14,7 @@ router.get('/compare', async (req, res) => {
   }
 });
 
-// Get rent price trends with comprehensive filtering
+// Get rent price trends with comprehensive filtering, now exclusively from Listings
 router.get('/', async (req, res) => {
   try {
     const {
@@ -25,7 +24,6 @@ router.get('/', async (req, res) => {
       maxRent,
       startDate,
       endDate,
-      dataSource = 'both', // 'scraped', 'listings', 'both'
       propertyType,
       period = 'month', // 'day', 'week', 'month', 'year'
       limit = 100
@@ -56,185 +54,72 @@ router.get('/', async (req, res) => {
 
     const dateFormat = getDateFormat(period);
 
-    // Scraped data pipeline
-    const scrapedPipeline = [];
-    if (dataSource === 'scraped' || dataSource === 'both') {
-      const scrapedMatch = { createdAt: dateFilter };
-      
-      // Add location filters
-      if (area) scrapedMatch.area = { $regex: area, $options: 'i' };
-      if (district) scrapedMatch.district = { $regex: district, $options: 'i' };
-      
-      // Add rent range filter
-      if (minRent || maxRent) {
-        scrapedMatch.rent = {};
-        if (minRent) scrapedMatch.rent.$gte = Number(minRent);
-        if (maxRent) scrapedMatch.rent.$lte = Number(maxRent);
-      }
-      
-      // Add property type filter
-      if (propertyType) {
-        scrapedMatch.propertyType = { $regex: propertyType, $options: 'i' };
-      }
-
-      scrapedPipeline.push([
-        { $match: scrapedMatch },
-        {
-          $addFields: {
-            period: { $dateToString: { format: dateFormat, date: '$createdAt' } }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              period: '$period',
-              area: '$area',
-              district: '$district'
-            },
-            avgRent: { $avg: '$rent' },
-            minRent: { $min: '$rent' },
-            maxRent: { $max: '$rent' },
-            count: { $sum: 1 },
-            dataSource: { $first: 'scraped' }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            period: '$_id.period',
-            area: '$_id.area',
-            district: '$_id.district',
-            location: {
-              $cond: {
-                if: { $ne: ['$_id.area', null] },
-                then: '$_id.area',
-                else: '$_id.district'
-              }
-            },
-            avgRent: { $round: ['$avgRent', 0] },
-            minRent: 1,
-            maxRent: 1,
-            count: 1,
-            dataSource: 1
-          }
-        },
-        { $sort: { period: 1, location: 1 } },
-        { $limit: Number(limit) }
-      ]);
-    }
-
     // User listings pipeline
-    const listingsPipeline = [];
-    if (dataSource === 'listings' || dataSource === 'both') {
-      const listingsMatch = { createdAt: dateFilter };
-      
-      // Add location filters
-      if (area) listingsMatch.area = { $regex: area, $options: 'i' };
-      if (district) listingsMatch.district = { $regex: district, $options: 'i' };
-      
-      // Add price range filter
-      if (minRent || maxRent) {
-        listingsMatch.price = {};
-        if (minRent) listingsMatch.price.$gte = Number(minRent);
-        if (maxRent) listingsMatch.price.$lte = Number(maxRent);
-      }
-      
-      // Add property type filter
-      if (propertyType) {
-        listingsMatch.type = { $regex: propertyType, $options: 'i' };
-      }
-
-      listingsPipeline.push([
-        { $match: listingsMatch },
-        {
-          $addFields: {
-            period: { $dateToString: { format: dateFormat, date: '$createdAt' } }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              period: '$period',
-              area: '$area',
-              district: '$district'
-            },
-            avgRent: { $avg: '$price' },
-            minRent: { $min: '$price' },
-            maxRent: { $max: '$price' },
-            count: { $sum: 1 },
-            dataSource: { $first: 'listings' }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            period: '$_id.period',
-            area: '$_id.area',
-            district: '$_id.district',
-            location: {
-              $cond: {
-                if: { $ne: ['$_id.area', null] },
-                then: '$_id.area',
-                else: '$_id.district'
-              }
-            },
-            avgRent: { $round: ['$avgRent', 0] },
-            minRent: 1,
-            maxRent: 1,
-            count: 1,
-            dataSource: 1
-          }
-        },
-        { $sort: { period: 1, location: 1 } },
-        { $limit: Number(limit) }
-      ]);
-    }
-
-    // Execute pipelines
-    const promises = [];
-    if (scrapedPipeline.length > 0) {
-      promises.push(MarketSample.aggregate(scrapedPipeline[0]));
-    }
-    if (listingsPipeline.length > 0) {
-      promises.push(Listing.aggregate(listingsPipeline[0]));
-    }
-
-    const results = await Promise.all(promises);
+    const listingsMatch = { createdAt: dateFilter };
     
-    // Combine results
-    let combinedData = [];
-    results.forEach(result => {
-      if (result && result.length > 0) {
-        combinedData = combinedData.concat(result);
-      }
-    });
-
-    // If both sources requested, merge data for same period/location
-    if (dataSource === 'both' && results.length > 1) {
-      const mergedData = new Map();
-      
-      combinedData.forEach(item => {
-        const key = `${item.period}-${item.location}`;
-        if (mergedData.has(key)) {
-          const existing = mergedData.get(key);
-          const totalCount = existing.count + item.count;
-          const weightedAvg = (existing.avgRent * existing.count + item.avgRent * item.count) / totalCount;
-          
-          mergedData.set(key, {
-            ...existing,
-            avgRent: Math.round(weightedAvg),
-            minRent: Math.min(existing.minRent, item.minRent),
-            maxRent: Math.max(existing.maxRent, item.maxRent),
-            count: totalCount,
-            dataSource: 'combined'
-          });
-        } else {
-          mergedData.set(key, item);
-        }
-      });
-      
-      combinedData = Array.from(mergedData.values());
+    // Add location filters
+    if (area) listingsMatch.area = { $regex: area, $options: 'i' };
+    if (district) listingsMatch.district = { $regex: district, $options: 'i' };
+    
+    // Add price range filter
+    if (minRent || maxRent) {
+      listingsMatch.price = {};
+      if (minRent) listingsMatch.price.$gte = Number(minRent);
+      if (maxRent) listingsMatch.price.$lte = Number(maxRent);
     }
+    
+    // Add property type filter
+    if (propertyType) {
+      listingsMatch.type = { $regex: propertyType, $options: 'i' };
+    }
+
+    const listingsPipeline = [
+      { $match: listingsMatch },
+      {
+        $addFields: {
+          period: { $dateToString: { format: dateFormat, date: '$createdAt' } }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            period: '$period',
+            area: '$area',
+            district: '$district'
+          },
+          avgRent: { $avg: '$price' },
+          minRent: { $min: '$price' },
+          maxRent: { $max: '$price' },
+          count: { $sum: 1 },
+          dataSource: { $first: 'listings' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id.period',
+          area: '$_id.area',
+          district: '$_id.district',
+          location: {
+            $cond: {
+              if: { $ne: ['$_id.area', null] },
+              then: '$_id.area',
+              else: '$_id.district'
+            }
+          },
+          avgRent: { $round: ['$avgRent', 0] },
+          minRent: 1,
+          maxRent: 1,
+          count: 1,
+          dataSource: 1
+        }
+      },
+      { $sort: { period: 1, location: 1 } },
+      { $limit: Number(limit) }
+    ];
+
+    // Execute pipeline
+    const combinedData = await Listing.aggregate(listingsPipeline);
 
     // Sort by period and location
     combinedData.sort((a, b) => {
@@ -260,7 +145,7 @@ router.get('/', async (req, res) => {
 
     // Calculate summary statistics
     const totalRecords = combinedData.reduce((sum, item) => sum + item.count, 0);
-    const overallAvgRent = combinedData.length > 0 
+    const overallAvgRent = totalRecords > 0 
       ? Math.round(combinedData.reduce((sum, item) => sum + (item.avgRent * item.count), 0) / totalRecords)
       : 0;
 
@@ -284,7 +169,7 @@ router.get('/', async (req, res) => {
         maxRent,
         startDate,
         endDate,
-        dataSource,
+        dataSource: 'listings', // Hardcoded as we only use listings
         propertyType,
         period
       }
@@ -300,20 +185,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get available filter options
+// Get available filter options from Listings
 router.get('/filters', async (req, res) => {
   try {
-    const [scrapedAreas, scrapedDistricts, listingAreas, listingDistricts, propertyTypes] = await Promise.all([
-      MarketSample.distinct('area'),
-      MarketSample.distinct('district'),
+    const [listingAreas, listingDistricts, propertyTypes] = await Promise.all([
       Listing.distinct('area'),
       Listing.distinct('district'),
-      MarketSample.distinct('propertyType')
+      Listing.distinct('type') // 'type' is the field in listings for property type
     ]);
 
-    // Combine and deduplicate
-    const allAreas = [...new Set([...scrapedAreas, ...listingAreas])].filter(Boolean).sort();
-    const allDistricts = [...new Set([...scrapedDistricts, ...listingDistricts])].filter(Boolean).sort();
+    const allAreas = [...new Set(listingAreas)].filter(Boolean).sort();
+    const allDistricts = [...new Set(listingDistricts)].filter(Boolean).sort();
 
     res.json({
       success: true,
