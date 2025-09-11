@@ -76,34 +76,38 @@ async function unlinkSafe(filePath) {
 // Create listing (requires authenticated owner)
 router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
   try {
-  // prefer token user, fall back to legacy header for non-auth clients
-    const userId = (req.auth && req.auth.userId) || getUserId(req);
-    if (!userId) return res.status(401).json({ error: 'userId required (authenticate or provide x-user-id)' });
+    // The `authenticate` middleware adds the `auth` object to the request.
+    // We MUST use this as the source of truth for the user's identity.
+    const userId = req.auth?.userId;
+    if (!userId) {
+      // This case should ideally not be hit if `authenticate` middleware is working correctly.
+      return res.status(401).json({ error: 'Authentication failed: User ID not found.' });
+    }
 
-  const base = `${req.protocol}://${req.get('host')}`;
-  const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-  const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
+    const base = `${req.protocol}://${req.get('host')}`;
+    const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
+    const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
 
-  // Basic required validations
-  const missing = [];
-  if (!req.body.title || !req.body.title.trim()) missing.push('title');
-  if (req.body.price === undefined || req.body.price === '') missing.push('price');
-  if (!req.body.type) missing.push('type');
-  if (!req.body.division) missing.push('division');
-  if (!req.body.district) missing.push('district');
-  if (!req.body.subdistrict) missing.push('subdistrict');
-  if (!req.body.area) missing.push('area');
-  if (req.body.propertyType === undefined || req.body.propertyType === '') missing.push('propertyType');
-  if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
-  const floorNum = req.body.floor !== undefined ? Number(req.body.floor) : undefined;
-  if (floorNum === undefined || Number.isNaN(floorNum) || floorNum < 0) missing.push('floor');
-  if (!req.body.availableFrom) missing.push('availableFrom');
-  const roomsNum = req.body.rooms !== undefined ? Number(req.body.rooms) : undefined;
-  if (roomsNum === undefined || Number.isNaN(roomsNum) || roomsNum < 0) missing.push('rooms');
-  if (photoUrls.length === 0) missing.push('photos');
-  if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
+    // Basic required validations
+    const missing = [];
+    if (!req.body.title || !req.body.title.trim()) missing.push('title');
+    if (req.body.price === undefined || req.body.price === '') missing.push('price');
+    if (!req.body.type) missing.push('type');
+    if (!req.body.division) missing.push('division');
+    if (!req.body.district) missing.push('district');
+    if (!req.body.subdistrict) missing.push('subdistrict');
+    if (!req.body.area) missing.push('area');
+    if (req.body.propertyType === undefined || req.body.propertyType === '') missing.push('propertyType');
+    if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
+    const floorNum = req.body.floor !== undefined ? Number(req.body.floor) : undefined;
+    if (floorNum === undefined || Number.isNaN(floorNum) || floorNum < 0) missing.push('floor');
+    if (!req.body.availableFrom) missing.push('availableFrom');
+    const roomsNum = req.body.rooms !== undefined ? Number(req.body.rooms) : undefined;
+    if (roomsNum === undefined || Number.isNaN(roomsNum) || roomsNum < 0) missing.push('rooms');
+    if (photoUrls.length === 0) missing.push('photos');
+    if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
 
-  const payload = {
+    const payload = {
       ...req.body,
       userId,
       price: (() => { const n = Number(req.body.price); return Number.isFinite(n) && n > 0 ? n : 0; })(),
@@ -635,7 +639,7 @@ router.get('/trends/data', async (req, res) => {
 
     // Determine date format based on period
   const dateFormat = period === 'year' ? '%Y' : '%Y-%m';
-    const groupBy = period === 'year' ? '$year' : '$month';
+  const groupBy = period === 'year' ? '$year' : '$month';
 
     // Date window similar to compare route
     const since = new Date();
