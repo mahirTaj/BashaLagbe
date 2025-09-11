@@ -28,33 +28,54 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 
-// MongoDB connection with improved timeout handling
+// MongoDB connection with improved timeout handling and retry logic
 const connectDB = async () => {
-  try {
-    const mongoURI = process.env.MONGO_URI;
-    if (!mongoURI) {
-      throw new Error('MONGO_URI environment variable is not set');
-    }
-    
-    console.log('🔄 Connecting to MongoDB...');
-    
-    const conn = await mongoose.connect(mongoURI, {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 30000, // 30 seconds
-      socketTimeoutMS: 45000, // 45 seconds
-      connectTimeoutMS: 30000,
-      family: 4, // Use IPv4, skip trying IPv6
-    });
-    
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    console.log(`📊 Database: ${conn.connection.name}`);
-  } catch (error) {
-    console.error(`❌ MongoDB connection error: ${error.message}`);
-    console.error('🔧 Check MONGO_URI and MongoDB Atlas network access');
-    
-    // In production, don't exit immediately, let health check handle it
-    if (process.env.NODE_ENV !== 'production') {
-      process.exit(1);
+  let retries = 3;
+  
+  while (retries > 0) {
+    try {
+      const mongoURI = process.env.MONGO_URI;
+      if (!mongoURI) {
+        throw new Error('MONGO_URI environment variable is not set');
+      }
+      
+      console.log(`🔄 Connecting to MongoDB... (Attempt ${4 - retries}/3)`);
+      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      
+      const conn = await mongoose.connect(mongoURI, {
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 60000, // Increased to 60 seconds
+        socketTimeoutMS: 75000, // Increased to 75 seconds
+        connectTimeoutMS: 60000, // Increased to 60 seconds
+        heartbeatFrequencyMS: 10000, // Check connection every 10 seconds
+        maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+        family: 4, // Use IPv4, skip trying IPv6
+      });
+      
+      console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+      console.log(`📊 Database: ${conn.connection.name}`);
+      console.log(`🔌 Connection State: ${conn.connection.readyState}`);
+      return; // Success, exit retry loop
+      
+    } catch (error) {
+      retries--;
+      console.error(`❌ MongoDB connection error (${3 - retries}/3): ${error.message}`);
+      
+      if (retries === 0) {
+        console.error('🔧 Troubleshooting tips:');
+        console.error('   1. Check MONGO_URI format');
+        console.error('   2. Verify MongoDB Atlas network access (0.0.0.0/0)');
+        console.error('   3. Ensure database user has proper permissions');
+        console.error('   4. Check if MongoDB cluster is running');
+        
+        // In production, don't exit immediately, let health check handle it
+        if (process.env.NODE_ENV !== 'production') {
+          process.exit(1);
+        }
+      } else {
+        console.log(`⏳ Retrying in 5 seconds... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     }
   }
 };
@@ -99,20 +120,51 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  const dbState = {
+    0: 'disconnected',
+    1: 'connected', 
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+  
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    database: dbStatus,
+    database: {
+      status: dbStatus,
+      state: dbState[mongoose.connection.readyState],
+      readyState: mongoose.connection.readyState,
+      host: mongoose.connection.host || 'unknown',
+      name: mongoose.connection.name || 'unknown'
+    },
     environment: process.env.NODE_ENV || 'development',
-    mongoUri: process.env.MONGO_URI ? 'configured' : 'missing'
+    mongoUri: process.env.MONGO_URI ? 'configured' : 'missing',
+    server: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.version
+    }
   });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/listings', listingsRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/trends', trendsRoutes);
+// Middleware to check database connection
+const checkDBConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    console.error(`❌ API request to ${req.path} rejected - DB not connected (state: ${mongoose.connection.readyState})`);
+    return res.status(503).json({
+      error: 'Database connection unavailable',
+      message: 'Please try again in a moment',
+      dbState: mongoose.connection.readyState
+    });
+  }
+  next();
+};
+
+// API routes with database connection check
+app.use('/api/auth', checkDBConnection, authRoutes);
+app.use('/api/listings', checkDBConnection, listingsRoutes);
+app.use('/api/admin', checkDBConnection, adminRoutes);
+app.use('/api/trends', checkDBConnection, trendsRoutes);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'backend/uploads')));
