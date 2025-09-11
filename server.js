@@ -42,8 +42,6 @@ const connectDB = async () => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 30000, // 30 seconds
       socketTimeoutMS: 45000, // 45 seconds
-      bufferMaxEntries: 0,
-      bufferCommands: false,
       connectTimeoutMS: 30000,
       family: 4, // Use IPv4, skip trying IPv6
     });

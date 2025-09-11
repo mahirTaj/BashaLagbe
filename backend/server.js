@@ -56,8 +56,6 @@ const connectDB = async () => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 30000, // 30 seconds
       socketTimeoutMS: 45000, // 45 seconds
-      bufferMaxEntries: 0,
-      bufferCommands: false,
       connectTimeoutMS: 30000,
       family: 4, // Use IPv4, skip trying IPv6
     });
@@ -85,7 +83,6 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
-  .catch(err => console.error(err));
 
 // Global error handler to make upload errors readable in the client
 // eslint-disable-next-line no-unused-vars
