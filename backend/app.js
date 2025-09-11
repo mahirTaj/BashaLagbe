@@ -91,25 +91,6 @@ app.get('/api/debug/config', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRoute);
-app.use('/api/listings', listingsRoute);
-app.use('/api/admin', adminRoute);
-app.use('/api/trends', trendsRoute);
-
-app.use('/api*', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found' });
-});
-
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
-  }
-  if (err) {
-    return res.status(500).json({ error: err.message || 'Server error' });
-  }
-  next();
-});
-
 // Connect to Mongo once (works for serverless warm starts)
 const mongoURI = process.env.MONGO_URI;
 let mongoConnectingPromise = null;
@@ -129,6 +110,40 @@ function ensureMongoConnected() {
 // Attach a guard to connect on first API request
 app.use(async (req, res, next) => {
   try { await ensureMongoConnected(); next(); } catch (e) { res.status(503).json({ error: 'Database not ready' }); }
+});
+
+// Extra debug status
+app.get('/api/debug/status', (req, res) => {
+  res.json({
+    mongoReadyState: mongoose.connection.readyState,
+    hasMongoUri: Boolean(process.env.MONGO_URI),
+    hasJwtSecret: Boolean(process.env.JWT_SECRET),
+  });
+});
+
+// Routes (after DB guard)
+app.use('/api/auth', authRoute);
+app.use('/api/listings', listingsRoute);
+app.use('/api/admin', adminRoute);
+app.use('/api/trends', trendsRoute);
+// Also mount without /api in case of differing rewrites
+app.use('/auth', authRoute);
+app.use('/listings', listingsRoute);
+app.use('/admin', adminRoute);
+app.use('/trends', trendsRoute);
+
+app.use(['/api*','/auth*','/listings*','/admin*','/trends*'], (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
+  }
+  if (err) {
+    return res.status(500).json({ error: err.message || 'Server error' });
+  }
+  next();
 });
 
 module.exports = app;
