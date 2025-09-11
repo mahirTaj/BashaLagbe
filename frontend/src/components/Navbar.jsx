@@ -6,7 +6,7 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       {/* ...other nav items... */}
-  <button onClick={() => navigate('/admin-login')} className="admin-btn">
+      <button onClick={() => navigate('/admin-login')} className="admin-btn">
         Admin
       </button>
     </nav>

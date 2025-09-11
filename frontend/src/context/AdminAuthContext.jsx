@@ -20,23 +20,16 @@ export function AdminAuthProvider({ children }) {
       const expiryTime = parseInt(adminExpiry, 10);
 
       if (now < expiryTime) {
-        // Verify role from token is admin
-        try {
-          const decoded = jwtDecode(adminToken);
-          if (decoded && decoded.role === 'admin') {
-            setIsAdminLoggedIn(true);
-          } else {
-            localStorage.removeItem('adminToken');
-            localStorage.removeItem('adminTokenExpiry');
-          }
-        } catch {
-          localStorage.removeItem('adminToken');
-          localStorage.removeItem('adminTokenExpiry');
-        }
+        setIsAdminLoggedIn(true);
+        // Removed: axios.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
+        // Dev admin header for backend admin routes
+        // Removed: axios.defaults.headers.common['admin-token'] = 'superadmin-token';
       } else {
         // Token expired, clean up
         localStorage.removeItem('adminToken');
         localStorage.removeItem('adminTokenExpiry');
+        // Removed: delete axios.defaults.headers.common['Authorization'];
+        // Removed: delete axios.defaults.headers.common['admin-token'];
       }
     }
     setIsLoading(false);
@@ -52,11 +45,6 @@ export function AdminAuthProvider({ children }) {
       let decoded;
       try { decoded = jwtDecode(token); } catch (e) { decoded = null; }
 
-      // Ensure this is an admin account
-      if (!decoded || decoded.role !== 'admin') {
-        return false;
-      }
-
       const expiry = decoded && decoded.exp ? decoded.exp * 1000 : (new Date().getTime() + (24 * 60 * 60 * 1000));
 
       localStorage.setItem('adminToken', token);
@@ -64,7 +52,7 @@ export function AdminAuthProvider({ children }) {
       // Removed: axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       // Dev admin header for backend admin routes
       // Removed: axios.defaults.headers.common['admin-token'] = 'superadmin-token';
-  setIsAdminLoggedIn(true);
+      setIsAdminLoggedIn(true);
       return true;
     } catch (e) {
       return false;

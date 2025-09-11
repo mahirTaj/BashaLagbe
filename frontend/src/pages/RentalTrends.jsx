@@ -45,6 +45,7 @@ const RentalTrends = () => {
 
   // Filter options
   const [areas, setAreas] = useState([]);
+  const [districts, setDistricts] = useState([]);
   const [popularAreas, setPopularAreas] = useState([]);
 
   // User selections

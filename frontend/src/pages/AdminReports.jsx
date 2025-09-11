@@ -28,7 +28,14 @@ import {
   CardContent,
   Grid
 } from '@mui/material';
-import { Report, Visibility, Edit, CheckCircle } from '@mui/icons-material';
+import {
+  Report,
+  CheckCircle,
+  Cancel,
+  Visibility,
+  Edit,
+  Delete
+} from '@mui/icons-material';
 import axios from 'axios';
 
 const AdminReports = () => {
@@ -50,7 +57,6 @@ const AdminReports = () => {
   useEffect(() => {
     fetchReports();
     fetchStats();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, filters]);
 
   const fetchReports = async () => {
@@ -60,7 +66,10 @@ const AdminReports = () => {
   if (filters.status) params.status = filters.status;
   if (filters.reason) params.reason = filters.reason;
   if (filters.reportType) params.reportType = filters.reportType;
-  const response = await axios.get('/api/listings/reports', { params });
+      const response = await axios.get('/api/listings/reports', {
+        params,
+        headers: { 'admin-token': 'superadmin-token' }
+      });
       setReports(response.data.reports);
       setPagination(response.data.pagination);
     } catch (err) {
@@ -72,7 +81,9 @@ const AdminReports = () => {
 
   const fetchStats = async () => {
     try {
-  const response = await axios.get('/api/listings/reports/stats');
+      const response = await axios.get('/api/listings/reports/stats', {
+        headers: { 'admin-token': 'superadmin-token' }
+      });
       setStats(response.data);
     } catch (err) {
       console.error('Failed to fetch stats');
@@ -86,7 +97,8 @@ const AdminReports = () => {
       setActionLoading(true);
       await axios.put(
         `/api/listings/reports/${selectedReport._id}`,
-        actionForm
+        actionForm,
+        { headers: { 'admin-token': 'superadmin-token' } }
       );
       setActionDialog(false);
       setSelectedReport(null);

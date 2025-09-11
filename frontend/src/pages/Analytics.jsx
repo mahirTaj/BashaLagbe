@@ -38,17 +38,15 @@ import {
   PieChart as RechartsPieChart,
   Pie,
   Cell,
-  // Legend
+  Legend
 } from 'recharts';
 import adminAPI from '../services/adminAPI';
 
 const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  // const [totalSamples, setTotalSamples] = useState(0);
+  const [totalSamples, setTotalSamples] = useState(0);
   const [averageRentData, setAverageRentData] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-  const hasAverageRent = averageRentData && averageRentData.length > 0;
   const [districtStats, setDistrictStats] = useState([]);
   const [areaStats, setAreaStats] = useState([]);
   const [propertyTypeStats, setPropertyTypeStats] = useState([]);
@@ -145,7 +143,7 @@ const Analytics = () => {
         uniqueDistricts: overview.uniqueDistricts || 0,
         uniqueAreas: overview.uniqueAreas || 0
       });
-  // setTotalSamples(overview.totalProperties || 0);
+      setTotalSamples(overview.totalProperties || 0);
 
       // Set district statistics
       const districtStats = districtResponse.data.map(item => ({

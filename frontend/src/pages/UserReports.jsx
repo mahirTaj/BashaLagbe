@@ -29,7 +29,7 @@ import { getAuthHeaders } from '../utils/authHeaders';
 
 const UserReports = () => {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

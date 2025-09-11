@@ -62,7 +62,7 @@ export const Button = React.forwardRef(({ className, variant, size, asChild = fa
       className={twMerge(
         buttonVariants({ variant, size }),
   // sheen overlay
-  'before:content-[""] before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/10 before:to-transparent before:opacity-50 before:pointer-events-none before:transition-opacity before:duration-300 group-hover:before:opacity-80'
+  'before:content-["\""] before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/10 before:to-transparent before:opacity-50 before:pointer-events-none before:transition-opacity before:duration-300 group-hover:before:opacity-80'
       , className)}
       {...props}
     />

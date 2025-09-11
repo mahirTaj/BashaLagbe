@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import {
   LineChart,
@@ -50,11 +49,8 @@ const RentTrendsDashboard = () => {
   ];
 
   // Fetch filter options on component mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchFilterOptions();
-    // Deliberately call once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchTrendsData(); // Load initial data
   }, []);
 

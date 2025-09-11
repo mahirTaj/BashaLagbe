@@ -64,22 +64,17 @@ export default function MapPage() {
   };
 
   return (
-    <div className="container" style={{ display: 'grid', gap: 16 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 16px', borderRadius: 16,
-        background: 'linear-gradient(135deg, #111827, #1f2937)', color: '#f3f4f6',
-        boxShadow: '0 12px 28px rgba(0,0,0,0.18)'
-      }}>
-        <h2 style={{ margin: 0, letterSpacing: '.02em' }}>Interactive Map</h2>
-        <span style={{ fontSize: 12, opacity: .85 }}>{loading ? 'Loading…' : `${items.length} results in view`}</span>
+    <div className="container" style={{ display: 'grid', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h2 style={{ margin: 0 }}>Map (Bangladesh)</h2>
+        <Link to="/heatmap" className="btn sm" style={{ marginLeft: 6 }}>Heatmap</Link>
       </div>
       {err && <div className="card" style={{ color: 'red' }}>{err}</div>}
-    <div className="card" style={{ padding: 0, overflow: 'hidden', borderRadius: 16, boxShadow: '0 14px 32px rgba(0,0,0,0.12)' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <MapContainer
           center={centerDhaka}
           zoom={12}
-      style={{ height: 560 }}
+          style={{ height: 520 }}
           maxBounds={BD_BOUNDS}
           maxBoundsViscosity={1.0}
         >

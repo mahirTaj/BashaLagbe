@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../auth';
 import { getDivisions, getDistricts, getUpazilas } from '../data/bd-geo';
-import { Box, Paper, Grid, TextField, Select, MenuItem, FormControl, InputLabel, Button, Typography, Checkbox, FormControlLabel, Stack, Tabs, Tab } from '@mui/material';
+import { Box, Paper, Grid, TextField, Select, MenuItem, FormControl, InputLabel, Button, Typography, Checkbox, FormControlLabel, Chip, Stack, Tabs, Tab } from '@mui/material';
 import MapPicker from '../components/MapPicker';
 
 const empty = {
@@ -12,7 +12,7 @@ const empty = {
   type: 'Apartment',
   price: '',
   availableFrom: '',
-  propertyType: 'For Rent',
+  propertytype: 'For Rent',
   rooms: '',
   bathrooms: '',
   balcony: '',

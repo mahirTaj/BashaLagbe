@@ -21,6 +21,8 @@ import {
   CloudUpload,
   FileUpload,
   Assessment,
+  CheckCircle,
+  Visibility,
   Close
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';

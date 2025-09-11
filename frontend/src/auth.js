@@ -3,10 +3,7 @@ import axios from 'axios';
 import jwtDecode from 'jwt-decode';
 
 // Configure axios base URL
-// In production (served by the backend), use same origin by default.
-// In local dev without env, fallback to http://localhost:5000.
-const API_BASE = process.env.REACT_APP_API_BASE_URL || (typeof window !== 'undefined' ? '' : 'http://localhost:5000');
-axios.defaults.baseURL = API_BASE;
+axios.defaults.baseURL = 'http://localhost:5000';
 
 const AuthCtx = createContext(null);
 

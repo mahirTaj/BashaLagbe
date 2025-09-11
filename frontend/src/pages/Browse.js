@@ -10,7 +10,7 @@ export default function Browse() {
   const paramsIn = new URLSearchParams(location.search);
   const q = paramsIn.get('q') || '';
   const [type, setType] = useState('');
-  // Removed For Rent / For Sale filter
+  const [propertyType, setPropertyType] = useState('');
   const [division, setDivision] = useState('');
   const [district, setDistrict] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
@@ -40,7 +40,7 @@ export default function Browse() {
     const p = { page, limit, sort };
     if (q) p.q = q;
     if (type) p.type = type;
-  // removed propertyType from params
+  if (propertyType) p.propertyType = propertyType;
     if (division) p.division = division;
     if (district) p.district = district;
     if (subdistrict) p.subdistrict = subdistrict;
@@ -77,11 +77,9 @@ export default function Browse() {
     if (priceMin !== '' && priceMax !== '' && Number(priceMax) < Number(priceMin)) {
       setPriceMax(priceMin); // snap up to min
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceMin]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetch(); }, [params, numericExtendedParams]);
+  useEffect(() => { fetch(); /* eslint-disable-next-line */ }, [params, numericExtendedParams]);
 
   const fetch = async () => {
     setLoading(true); setError('');
@@ -100,7 +98,7 @@ export default function Browse() {
   // Clear URL search param q
   const p = new URLSearchParams(location.search); p.delete('q');
   navigate({ pathname: '/browse', search: p.toString() }, { replace: true });
-  setType(''); setDivision(''); setDistrict(''); setSubdistrict(''); setArea('');
+  setType(''); setPropertyType(''); setDivision(''); setDistrict(''); setSubdistrict(''); setArea('');
   setPriceMin(''); setPriceMax(''); setRoomsMin(''); setRoomsMax('');
   setBathroomsMin(''); setBathroomsMax(''); setPersonMin(''); setPersonMax('');
   setBalconyMin(''); setBalconyMax(''); setServiceChargeMin(''); setServiceChargeMax('');
@@ -122,18 +120,10 @@ export default function Browse() {
   }, [items]);
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 16px', borderRadius: 16,
-        background: 'linear-gradient(135deg, #111827, #1f2937)', color: '#f3f4f6',
-        boxShadow: '0 12px 28px rgba(0,0,0,0.18)'
-      }}>
-        <h2 style={{ margin: 0, letterSpacing: '.02em' }}>Browse Rentals</h2>
-        <span style={{ fontSize: 12, opacity: .85 }}>{total} results</span>
-      </div>
-      <form onSubmit={e => { e.preventDefault(); setPage(1); fetch(); }} className="card" style={{ display: 'grid', gap: 16, padding: 16, borderRadius: 16, boxShadow: '0 14px 32px rgba(0,0,0,0.08)' }}>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
+    <div style={{ display: 'grid', gap: 16 }}>
+      <h2 style={{ margin: 0 }}>Browse Rentals</h2>
+      <form onSubmit={e => { e.preventDefault(); setPage(1); fetch(); }} className="card" style={{ display: 'grid', gap: 12 }}>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
           <select value={type} onChange={e => setType(e.target.value)}>
             <option value="">All types</option>
             <option>Apartment</option>
@@ -158,7 +148,11 @@ export default function Browse() {
               {districtOptions.map(d => <option key={d} value={d} />)}
             </datalist>
           </div>
-          {/* Removed For Rent / For Sale dropdown */}
+          <select value={propertyType} onChange={e => setPropertyType(e.target.value)}>
+            <option value="">All</option>
+            <option value="For Rent">For Rent</option>
+            <option value="For Sale">For Sale</option>
+          </select>
           <div style={{ position:'relative' }}>
             <input list="upazilaOptions" placeholder="Subdistrict / Upazila" value={subdistrict} disabled={!district} onChange={e => setSubdistrict(e.target.value)} />
             <datalist id="upazilaOptions">
@@ -190,29 +184,30 @@ export default function Browse() {
             <option value="price_desc">Price ↓</option>
           </select>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="submit" className="btn" style={{ borderRadius: 12, padding: '10px 16px', fontWeight: 700 }}>Search</button>
-          <button type="button" className="btn ghost" onClick={resetFilters} style={{ borderRadius: 12, padding: '10px 16px', fontWeight: 700 }}>Reset</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="submit" className="btn">Search</button>
+          <button type="button" className="btn ghost" onClick={resetFilters}>Reset</button>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#555' }}>{total} results</span>
         </div>
       </form>
 
-      {loading ? <p>Loading...</p> : error ? <p style={{ color: 'red' }}>{error}</p> : items.length === 0 ? <div className="card" style={{ borderRadius: 16 }}>No results.</div> : (
-        <div className="cards" style={{ gap: 16 }}>
+      {loading ? <p>Loading...</p> : error ? <p style={{ color: 'red' }}>{error}</p> : items.length === 0 ? <div className="card">No results.</div> : (
+        <div className="cards">
           {items.map(l => (
-            <Link key={l._id} to={`/listing/${l._id}`} className="card" style={{ display:'grid', gap: 10, textDecoration:'none', color:'inherit', minHeight: 280, borderRadius: 16, boxShadow: '0 14px 32px rgba(0,0,0,0.08)' }}>
-              <div style={{ width: '100%', height: 180, background:'#f3f4f6', position:'relative', borderRadius:12, overflow:'hidden' }}>
+            <Link key={l._id} to={`/listing/${l._id}`} className="card" style={{ display:'grid', gap: 8, textDecoration:'none', color:'inherit', minHeight: 260 }}>
+              <div style={{ width: '100%', height: 160, background:'#f3f4f6', position:'relative', borderRadius:4, overflow:'hidden' }}>
                 {l.photoUrls?.[0] ? (
                   <img src={l.photoUrls[0]} alt="thumb" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
                 ) : (
                   <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#777' }}>No Photo</div>
                 )}
-                {l.isRented && <span className="badge" style={{ position:'absolute', top:8, left:8, background:'#fff', color:'var(--success)', borderRadius: 10, padding: '4px 8px', fontWeight: 700 }}>Rented</span>}
+                {l.isRented && <span className="badge" style={{ position:'absolute', top:6, left:6, background:'#fff', color:'var(--success)' }}>Rented</span>}
               </div>
-              <b style={{ lineHeight:1.25, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', fontSize: 16 }}>{l.title}</b>
+              <b style={{ lineHeight:1.2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{l.title}</b>
               <div style={{ fontSize:12, color:'#666', display:'-webkit-box', WebkitLineClamp:1, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{[l.area,l.subdistrict,l.district,l.division].filter(Boolean).join(', ')}</div>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'auto' }}>
-                  <span style={{ fontWeight:800, fontSize: 16 }}>৳{l.price}</span>
-                <span style={{ fontSize:12, fontWeight: 600, opacity: .8 }}>{l.type}</span>
+                <span style={{ fontWeight:600 }}>৳{l.price}</span>
+                <span style={{ fontSize:12 }}>{l.type}</span>
               </div>
             </Link>
           ))}

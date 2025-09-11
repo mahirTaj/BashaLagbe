@@ -4,8 +4,6 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
-const helmet = require('helmet');
-const compression = require('compression');
 // Load environment variables from .env when present
 try { require('dotenv').config(); } catch (e) {}
 
@@ -13,68 +11,28 @@ const listingsRoute = require('./routes/listings');
 const adminRoute = require('./routes/admin');
 const authRoute = require('./routes/auth');
 const trendsRoute = require('./routes/trends');
-const { validateEnv } = require('./config/validateEnv');
-const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
 
 const app = express();
-const isProd = process.env.NODE_ENV === 'production';
 
-// Trust proxy when behind load balancers/reverse proxies
-if (process.env.TRUST_PROXY === 'true') {
-  app.set('trust proxy', 1);
-}
-
-// CORS: lock down origins in production via env (comma-separated list)
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
-
-const devBypass = process.env.DEV_ADMIN_BYPASS === 'true';
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!isProd) return callback(null, true);
-    // allow server-to-server/postman (no origin)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
+  origin: true, // Allow all origins for development
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', ...(devBypass ? ['admin-token'] : [])]
+  allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
 }));
+app.use(express.json());
 
-// Security & performance
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-}));
-app.use(compression());
-
-// Logging (skip in test environments)
-if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan(isProd ? 'combined' : 'dev'));
-}
-
-// Basic rate limiting on API in production
-if (isProd) {
-  app.use('/api/', rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false
-  }));
-}
-
-// Body parser with sane limits
-app.use(express.json({ limit: '1mb' }));
-
-// Serve uploaded assets (ensure your reverse proxy exposes this path publicly when using local storage)
+// Serve uploaded assets
 const uploadsPath = path.join(__dirname, 'uploads');
 try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
 app.use('/uploads', express.static(uploadsPath));
 
-// Health/status endpoint
-app.get('/api/health', (req, res) => {
+app.use('/api/listings', listingsRoute);
+app.use('/api/admin', adminRoute);
+app.use('/api/auth', authRoute);
+app.use('/api/trends', trendsRoute);
+
+// Root health/status endpoint
+app.get('/', (req, res) => {
   res.json({
     ok: true,
     service: 'BashaLagbe backend',
@@ -82,59 +40,55 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/api/auth', authRoute);
-app.use('/api/listings', listingsRoute);
-app.use('/api/admin', adminRoute);
-app.use('/api/trends', trendsRoute);
+const mongoURI = process.env.MONGO_URI || 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/bashalagbe?retryWrites=true&w=majority&appName=Cluster0';
 
-// 404 handler for unknown API routes
-app.use('/api*', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found' });
-});
-
-// Serve frontend build and handle SPA routing
-if (process.env.SERVE_FRONTEND === 'true') {
-  const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
-  
-  if (fs.existsSync(frontendBuild)) {
-    console.log('[startup] Serving frontend build from:', frontendBuild);
+// MongoDB connection with proper timeout settings
+const connectDB = async () => {
+  try {
+    if (!mongoURI) {
+      throw new Error('MONGO_URI environment variable is not set');
+    }
     
-    // Serve static files (JS, CSS, images, etc.)
-    app.use(express.static(frontendBuild, {
-      maxAge: '1d', // Cache static assets for 1 day
-      etag: false
-    }));
+    console.log('🔄 Connecting to MongoDB...');
     
-    // SPA fallback - serve index.html for all non-API routes
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(frontendBuild, 'index.html'));
+    await mongoose.connect(mongoURI, {
+      // Connection options
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 30000, // 30 seconds
+      socketTimeoutMS: 45000, // 45 seconds
+      bufferMaxEntries: 0,
+      bufferCommands: false,
+      connectTimeoutMS: 30000,
+      family: 4, // Use IPv4, skip trying IPv6
     });
-  } else {
-    console.warn('[startup] SERVE_FRONTEND=true but build folder missing:', frontendBuild);
     
-    // Fallback when build folder doesn't exist
-    app.get('*', (req, res) => {
-      res.status(503).json({
-        error: 'Frontend build not found',
-        message: 'Run npm run build to create the frontend build'
-      });
-    });
+    console.log('✅ MongoDB connected successfully');
+    console.log(`📊 Database: ${mongoose.connection.name}`);
+    console.log(`🌐 Host: ${mongoose.connection.host}`);
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.error('🔧 Check your MONGO_URI and network access settings');
+    
+    // In production, don't exit, let health checks handle it
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
   }
-} else {
-  console.log('[startup] SERVE_FRONTEND not enabled; API-only mode');
-  
-  // API-only mode - return service info at root
-  app.get('/', (req, res) => {
-    res.json({
-      ok: true,
-      service: 'BashaLagbe backend API',
-      endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
-    });
-  });
-}
+};
 
-// Global error handler
+// Connect to database
+connectDB();
+
+// Start server
+const port = process.env.PORT || 5000;
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+  .catch(err => console.error(err));
+
+// Global error handler to make upload errors readable in the client
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
@@ -145,26 +99,16 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// Validate env BEFORE connecting
-try { validateEnv(); } catch (e) { process.exit(1); }
-const mongoURI = process.env.MONGO_URI;
-
-mongoose.connect(mongoURI)
-  .then(() => {
-    console.log('MongoDB connected');
-    const port = process.env.PORT || 5000;
-    app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on port ${port}`);
-      console.log(`Health check: http://localhost:${port}/api/health`);
-    });
-  })
-  .catch(err => console.error(err));
-
-// Process-level safety
-process.on('unhandledRejection', (e) => {
-  console.error('Unhandled Rejection:', e);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('⏹️ SIGTERM received, shutting down gracefully');
+  await mongoose.connection.close();
+  process.exit(0);
 });
-process.on('uncaughtException', (e) => {
-  console.error('Uncaught Exception:', e);
+
+process.on('SIGINT', async () => {
+  console.log('⏹️ SIGINT received, shutting down gracefully');
+  await mongoose.connection.close();
+  process.exit(0);
 });
 
