@@ -861,13 +861,6 @@ router.get('/trends/compare', async (req, res) => {
           period: '$_id.period',
           area: '$_id.area',
           district: '$_id.district',
-          location: {
-            $cond: {
-              if: { $and: [ { $ne: ['$_id.area', null] }, { $ne: ['$_id.area', ''] } ] },
-              then: '$_id.area',
-              else: '$_id.district'
-            }
-          },
           avgRent: { $round: ['$avgRent', 0] },
           count: 1,
           source: 'scraped',
