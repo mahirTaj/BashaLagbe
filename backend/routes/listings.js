@@ -281,7 +281,9 @@ router.get('/', authenticate, async (req, res) => {
 // sort=price_asc|price_desc|newest|oldest
 // --------------------------------------------------
 router.get('/search', async (req, res) => {
+  const start = Date.now();
   try {
+    console.log('[listings/search] query params:', req.query);
     const {
       q,
       type,
@@ -404,10 +406,15 @@ router.get('/search', async (req, res) => {
     };
     const sortOpt = sortMap[sort] || sortMap.newest;
 
-    const [data, total] = await Promise.all([
-      Listing.find(filter).sort(sortOpt).skip(skip).limit(limitNum),
-      Listing.countDocuments(filter),
-    ]);
+    let data = [];
+    let total = 0;
+    try {
+      data = await Listing.find(filter).sort(sortOpt).skip(skip).limit(limitNum).exec();
+      total = await Listing.countDocuments(filter).exec();
+    } catch (dbErr) {
+      console.error('[listings/search] Mongo query error:', dbErr.message, { filter, sortOpt, skip, limitNum });
+      return res.status(500).json({ error: 'Database query failed', details: process.env.NODE_ENV === 'production' ? undefined : dbErr.message });
+    }
 
     res.json({
       data,
@@ -416,9 +423,11 @@ router.get('/search', async (req, res) => {
       limit: limitNum,
       total,
       hasMore: skip + data.length < total,
+      tookMs: Date.now() - start,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[listings/search] Handler error:', err);
+    res.status(500).json({ error: err.message || 'Search failed' });
   }
 });
 

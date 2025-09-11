@@ -10,7 +10,13 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 
-// Import routes from backend
+// ---- Mongoose Global Configuration ----
+// Disable command buffering to control readiness explicitly
+mongoose.set('bufferCommands', false);
+// Disable buffering timeout to prevent the 10000ms error
+mongoose.set('bufferTimeoutMS', 0);
+
+// Import routes (it's safe to import them here)
 const authRoutes = require('./backend/routes/auth');
 const listingsRoutes = require('./backend/routes/listings');
 const adminRoutes = require('./backend/routes/admin');
@@ -18,199 +24,155 @@ const trendsRoutes = require('./backend/routes/trends');
 
 const app = express();
 
-// Trust proxy for Render
-app.set('trust proxy', 1);
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-
-// MongoDB connection with improved timeout handling and retry logic
-const connectDB = async () => {
-  let retries = 3;
-  
-  while (retries > 0) {
-    try {
-      const mongoURI = process.env.MONGO_URI;
-      if (!mongoURI) {
-        throw new Error('MONGO_URI environment variable is not set');
-      }
-      
-      console.log(`🔄 Connecting to MongoDB... (Attempt ${4 - retries}/3)`);
-      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      
-      const conn = await mongoose.connect(mongoURI, {
-        maxPoolSize: 10,
-        serverSelectionTimeoutMS: 60000, // Increased to 60 seconds
-        socketTimeoutMS: 75000, // Increased to 75 seconds
-        connectTimeoutMS: 60000, // Increased to 60 seconds
-        heartbeatFrequencyMS: 10000, // Check connection every 10 seconds
-        maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
-        family: 4, // Use IPv4, skip trying IPv6
-      });
-      
-      console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-      console.log(`📊 Database: ${conn.connection.name}`);
-      console.log(`🔌 Connection State: ${conn.connection.readyState}`);
-      return; // Success, exit retry loop
-      
-    } catch (error) {
-      retries--;
-      console.error(`❌ MongoDB connection error (${3 - retries}/3): ${error.message}`);
-      
-      if (retries === 0) {
-        console.error('🔧 Troubleshooting tips:');
-        console.error('   1. Check MONGO_URI format');
-        console.error('   2. Verify MongoDB Atlas network access (0.0.0.0/0)');
-        console.error('   3. Ensure database user has proper permissions');
-        console.error('   4. Check if MongoDB cluster is running');
-        
-        // In production, don't exit immediately, let health check handle it
-        if (process.env.NODE_ENV !== 'production') {
-          process.exit(1);
-        }
-      } else {
-        console.log(`⏳ Retrying in 5 seconds... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
+// --- Centralized Asynchronous Startup Function ---
+async function startServer() {
+  // 1. CONNECT TO DATABASE (with retry logic)
+  const mongoURI = process.env.MONGO_URI;
+  if (!mongoURI) {
+    console.error('❌ MONGO_URI is not set. Server cannot start.');
+    process.exit(1);
   }
-};
 
-// Connect to database
-connectDB();
-
-// Middleware
-app.use(morgan('combined'));
-app.use(limiter);
-
-// CORS configuration
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.CLIENT_URL || 'https://your-app-name.onrender.com']
-    : ['http://localhost:3000', 'http://localhost:3001'],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
-};
-app.use(cors(corsOptions));
-
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: process.env.DISABLE_CSP === 'true' ? false : {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https://api.mapbox.com"]
+  const connectWithRetry = async () => {
+    try {
+      console.log('🔄 Attempting MongoDB connection...');
+      await mongoose.connect(mongoURI, {
+        maxPoolSize: 10, // Increased pool size for better concurrency
+        serverSelectionTimeoutMS: 15000, // Longer timeout for cold starts
+        socketTimeoutMS: 45000, // Longer socket timeout
+        connectTimeoutMS: 20000, // Longer connection timeout
+        retryWrites: true,
+      });
+      console.log('✅ MongoDB connected successfully.');
+    } catch (err) {
+      console.error('❌ MongoDB connection error:', err.message);
+      console.log('⏳ Retrying connection in 5 seconds...');
+      setTimeout(connectWithRetry, 5000); // Retry after 5s
     }
-  },
-  crossOriginEmbedderPolicy: false
-}));
-
-app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  const dbState = {
-    0: 'disconnected',
-    1: 'connected', 
-    2: 'connecting',
-    3: 'disconnecting'
   };
-  
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    database: {
-      status: dbStatus,
-      state: dbState[mongoose.connection.readyState],
-      readyState: mongoose.connection.readyState,
-      host: mongoose.connection.host || 'unknown',
-      name: mongoose.connection.name || 'unknown'
-    },
-    environment: process.env.NODE_ENV || 'development',
-    mongoUri: process.env.MONGO_URI ? 'configured' : 'missing',
-    server: {
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      version: process.version
-    }
-  });
-});
 
-// Middleware to check database connection
-const checkDBConnection = (req, res, next) => {
-  if (mongoose.connection.readyState !== 1) {
-    console.error(`❌ API request to ${req.path} rejected - DB not connected (state: ${mongoose.connection.readyState})`);
-    return res.status(503).json({
-      error: 'Database connection unavailable',
-      message: 'Please try again in a moment',
-      dbState: mongoose.connection.readyState
+  mongoose.connection.on('disconnected', () => {
+    console.warn('🚨 MongoDB disconnected! Attempting to reconnect...');
+    connectWithRetry();
+  });
+
+  await connectWithRetry(); // Initial connection attempt
+
+  // 2. CONFIGURE EXPRESS MIDDLEWARE (after DB connection is initiated)
+  
+  // Trust proxy for deployment environments like Render/Heroku
+  app.set('trust proxy', 1);
+
+  // Security, Compression, and Logging
+  app.use(helmet({
+    contentSecurityPolicy: process.env.DISABLE_CSP === 'true' ? false : {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts if needed, otherwise remove 'unsafe-inline'
+        connectSrc: ["'self'", "https://api.mapbox.com", "ws:"] // Allow websocket connections
+      }
+    },
+    crossOriginEmbedderPolicy: false
+  }));
+  app.use(compression());
+  app.use(morgan('dev')); // Use 'dev' for cleaner logs, 'combined' for production
+
+  // CORS configuration
+  const corsOptions = {
+    origin: process.env.NODE_ENV === 'production' 
+      ? [process.env.CLIENT_URL, 'https://bashalagbe.onrender.com'] // Add your production URL
+      : ['http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
+    optionsSuccessStatus: 200,
+    allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
+  };
+  app.use(cors(corsOptions));
+
+  // Rate limiting
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100,
+    message: 'Too many requests from this IP, please try again after 15 minutes.'
+  });
+  app.use('/api/', apiLimiter); // Apply rate limiter only to API routes
+
+  // Body Parsers
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // 3. DEFINE API ROUTES
+  
+  // Health check endpoint (does not need DB connection)
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Middleware to check for DB connection on all subsequent API routes
+  const checkDBConnection = (req, res, next) => {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'Service unavailable: Database not connected.' });
+    }
+    next();
+  };
+  app.use('/api', checkDBConnection); // Apply to all /api routes
+
+  // Register API routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/listings', listingsRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/trends', trendsRoutes);
+
+  // 4. SERVE STATIC ASSETS AND FRONTEND
+  
+  // Serve static files from uploads directory
+  app.use('/uploads', express.static(path.join(__dirname, 'backend/uploads')));
+
+  // Serve React frontend for production
+  if (process.env.NODE_ENV === 'production') {
+    const buildPath = path.join(__dirname, 'frontend/build');
+    app.use(express.static(buildPath));
+    // Handle React routing, return all non-API requests to React app
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(buildPath, 'index.html'));
     });
   }
-  next();
-};
 
-// API routes with database connection check
-app.use('/api/auth', checkDBConnection, authRoutes);
-app.use('/api/listings', checkDBConnection, listingsRoutes);
-app.use('/api/admin', checkDBConnection, adminRoutes);
-app.use('/api/trends', checkDBConnection, trendsRoutes);
-
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'backend/uploads')));
-
-// Serve React frontend
-const buildPath = path.join(__dirname, 'frontend/build');
-app.use(express.static(buildPath));
-
-// Handle React routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(buildPath, 'index.html'));
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : err.message,
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  // 5. CONFIGURE ERROR HANDLING
+  
+  // 404 Not Found for any unhandled API routes
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ message: 'API route not found' });
   });
-});
 
-// Handle unhandled routes
-app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
+  // Global error handler
+  app.use((err, req, res, next) => {
+    console.error('🚨 UNHANDLED ERROR:', err);
+    res.status(500).json({
+      message: 'Internal Server Error',
+      error: process.env.NODE_ENV === 'production' ? undefined : err.message,
+    });
+  });
 
-const PORT = process.env.PORT || 5000;
+  // 6. START THE HTTP SERVER
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server is live and listening on port ${PORT}`);
+    console.log(`✨ Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Database: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Connecting...'}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('⏹️ SIGTERM received, shutting down gracefully');
+// --- GRACEFUL SHUTDOWN ---
+const shutdown = async (signal) => {
+  console.log(`\n⏹️ ${signal} received, shutting down gracefully...`);
   await mongoose.connection.close();
+  console.log('🔌 MongoDB connection closed.');
   process.exit(0);
-});
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
-process.on('SIGINT', async () => {
-  console.log('⏹️ SIGINT received, shutting down gracefully');
-  await mongoose.connection.close();
-  process.exit(0);
-});
+// --- KICK OFF THE APPLICATION ---
+startServer();

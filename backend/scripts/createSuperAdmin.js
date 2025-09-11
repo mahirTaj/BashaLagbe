@@ -1,4 +1,5 @@
 // One-off script to create or update a Super Admin user
+require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
@@ -14,7 +15,20 @@ async function run() {
     process.exit(1);
   }
 
-  await mongoose.connect(MONGO);
+  // Configure mongoose to prevent buffering issues
+  mongoose.set('bufferCommands', false);
+  mongoose.set('bufferTimeoutMS', 0);
+
+  await mongoose.connect(MONGO, {
+    maxPoolSize: 5,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 20000,
+    connectTimeoutMS: 10000,
+    retryWrites: true,
+  });
+  
+  console.log('✅ Connected to MongoDB');
+  
   try {
     const hash = await bcrypt.hash(password, 10);
     const user = await User.findOneAndUpdate(

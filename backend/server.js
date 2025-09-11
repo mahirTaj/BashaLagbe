@@ -1,11 +1,17 @@
+// NOTE: This file mirrors the root server.js for cases where a platform start command points here.
+// Prefer using the root-level server.js to avoid duplication.
+
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer');
 const fs = require('fs');
-// Load environment variables from .env when present
-try { require('dotenv').config(); } catch (e) {}
+const multer = require('multer');
+
+// --- Mongoose Global Settings ---
+mongoose.set('bufferCommands', false);
+mongoose.set('bufferTimeoutMS', 0);
 
 const listingsRoute = require('./routes/listings');
 const adminRoute = require('./routes/admin');
@@ -13,99 +19,115 @@ const authRoute = require('./routes/auth');
 const trendsRoute = require('./routes/trends');
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(cors({
-  origin: true, // Allow all origins for development
+  origin: true,
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Serve uploaded assets
 const uploadsPath = path.join(__dirname, 'uploads');
 try { fs.mkdirSync(uploadsPath, { recursive: true }); } catch {}
 app.use('/uploads', express.static(uploadsPath));
 
-app.use('/api/listings', listingsRoute);
-app.use('/api/admin', adminRoute);
-app.use('/api/auth', authRoute);
-app.use('/api/trends', trendsRoute);
-
-// Root health/status endpoint
-app.get('/', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'BashaLagbe backend',
-    endpoints: ['/api/auth', '/api/listings', '/api/admin', '/api/trends']
-  });
-});
-
-const mongoURI = process.env.MONGO_URI || 'mongodb+srv://mahir19800:q1w2e3r4t5@cluster0.17romrq.mongodb.net/bashalagbe?retryWrites=true&w=majority&appName=Cluster0';
-
-// MongoDB connection with proper timeout settings
-const connectDB = async () => {
-  try {
-    if (!mongoURI) {
-      throw new Error('MONGO_URI environment variable is not set');
-    }
-    
-    console.log('🔄 Connecting to MongoDB...');
-    
-    await mongoose.connect(mongoURI, {
-      // Connection options
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 30000, // 30 seconds
-      socketTimeoutMS: 45000, // 45 seconds
-      connectTimeoutMS: 30000,
-      family: 4, // Use IPv4, skip trying IPv6
-    });
-    
-    console.log('✅ MongoDB connected successfully');
-    console.log(`📊 Database: ${mongoose.connection.name}`);
-    console.log(`🌐 Host: ${mongoose.connection.host}`);
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error.message);
-    console.error('🔧 Check your MONGO_URI and network access settings');
-    
-    // In production, don't exit, let health checks handle it
-    if (process.env.NODE_ENV !== 'production') {
-      process.exit(1);
-    }
+// DB connection checker
+const checkDBConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Database not connected', state: mongoose.connection.readyState });
   }
+  next();
 };
 
-// Connect to database
-connectDB();
+// Attach routes (guarded)
+app.use('/api/listings', checkDBConnection, listingsRoute);
+app.use('/api/admin', checkDBConnection, adminRoute);
+app.use('/api/auth', checkDBConnection, authRoute);
+app.use('/api/trends', checkDBConnection, trendsRoute);
 
-// Start server
-const port = process.env.PORT || 5000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+// Root status
+app.get('/', (req, res) => {
+  res.json({ ok: true, entry: 'backend/server.js', dbState: mongoose.connection.readyState });
 });
 
-// Global error handler to make upload errors readable in the client
+// Debug DB state
+app.get('/api/_debug/db', (req, res) => {
+  res.json({ state: mongoose.connection.readyState, ready: mongoose.connection.readyState === 1 });
+});
+
+// Health
+app.get('/api/health', (req, res) => {
+  const stateMap = {0:'disconnected',1:'connected',2:'connecting',3:'disconnecting'};
+  res.json({ service:'backend', state: stateMap[mongoose.connection.readyState], readyState: mongoose.connection.readyState, env: process.env.NODE_ENV });
+});
+
+// --- Connection Logic ---
+const connectDB = async () => {
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    console.error('❌ MONGO_URI missing (backend/server.js)');
+    return false;
+  }
+  const masked = uri.replace(/:(.*?)@/, ':****@');
+  console.log('[backend] Mongo URI:', masked);
+  let attempt = 0; const max = 3;
+  while (attempt < max) {
+    attempt++;
+    try {
+      console.log(`[backend] 🔄 Connecting (${attempt}/${max})`);
+      await mongoose.connect(uri, {
+        maxPoolSize: 5,
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 20000,
+        connectTimeoutMS: 10000,
+        retryWrites: true,
+      });
+      console.log('[backend] ✅ MongoDB connected');
+      return true;
+    } catch (e) {
+      console.error(`[backend] ❌ Attempt ${attempt} failed: ${e.message}`);
+      if (attempt < max) { await new Promise(r=>setTimeout(r,5000)); }
+    }
+  }
+  console.error('[backend] 🚫 All attempts failed');
+  return false;
+};
+
+let started = false;
+async function init() {
+  const ok = await connectDB();
+  start();
+  if (!ok) {
+    setInterval(async () => {
+      if (mongoose.connection.readyState !== 1) {
+        try { await mongoose.connect(process.env.MONGO_URI); console.log('[backend] ♻️ Reconnected'); } catch {}
+      }
+    }, 15000);
+  }
+}
+
+function start() {
+  if (started) return; started = true;
+  const port = process.env.PORT || 5000;
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`[backend] 🚀 Listening on ${port} (dbState=${mongoose.connection.readyState})`);
+  });
+}
+
+init();
+
+// Error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    return res.status(413).json({ error: 'Upload too large or invalid upload', code: err.code, field: err.field });
+    return res.status(413).json({ error: 'Upload too large', code: err.code });
   }
-  if (err) {
-    return res.status(500).json({ error: err.message || 'Server error' });
-  }
+  if (err) return res.status(500).json({ error: err.message || 'Server error' });
   next();
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('⏹️ SIGTERM received, shutting down gracefully');
-  await mongoose.connection.close();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  console.log('⏹️ SIGINT received, shutting down gracefully');
-  await mongoose.connection.close();
-  process.exit(0);
-});
+process.on('SIGTERM', async () => { await mongoose.connection.close(); process.exit(0); });
+process.on('SIGINT', async () => { await mongoose.connection.close(); process.exit(0); });
 
