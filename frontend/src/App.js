@@ -568,16 +568,16 @@ const router = createBrowserRouter(
       path: '/',
       element: <RootLayout />,
       children: [
-        { index: true, element: <Listings /> },
+        { index: true, element: <ProtectedRoute><Listings /></ProtectedRoute> },
         { path: 'browse', element: <Browse /> },
         { path: 'listing/:id', element: <ListingDetails /> },
-        { path: 'add', element: <AddEditListing /> },
-        { path: 'edit/:id', element: <AddEditListing /> },
+        { path: 'add', element: <ProtectedRoute><AddEditListing /></ProtectedRoute> },
+        { path: 'edit/:id', element: <ProtectedRoute><AddEditListing /></ProtectedRoute> },
         { path: 'map', element: <MapPage /> },
         { path: 'trends', element: <RentalTrends /> },
-  { path: 'compare-areas', element: <CompareAreas /> },
+        { path: 'compare-areas', element: <CompareAreas /> },
         { path: 'trends-dashboard', element: <RentTrendsDashboard /> },
-  { path: 'heatmap', element: <RentHeatmap /> },
+        { path: 'heatmap', element: <RentHeatmap /> },
         { path: 'login', element: <Login /> },
         { path: 'register', element: <Register /> },
         { path: 'admin-login', element: <React.Suspense fallback={<div>Loading...</div>}><AdminLogin /></React.Suspense> },
@@ -587,35 +587,9 @@ const router = createBrowserRouter(
         { path: 'admin-panel/data-validation', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><DataValidationInterface /></ProtectedAdminRoute></React.Suspense> },
         { path: 'admin-panel/scraped-data', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><ScrapedData /></ProtectedAdminRoute></React.Suspense> },
         { path: 'admin-panel/analytics', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><Analytics /></ProtectedAdminRoute></React.Suspense> },
-        import ReportForm from './pages/ReportForm';
-import ProtectedRoute from './ProtectedRoute';
-import MenuIcon from '@mui/icons-material/Menu';
-
-// Lazy import to avoid circular dependency
-const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
-// ...existing code...
-      element: <RootLayout />,
-      children: [
-        { index: true, element: <ProtectedRoute><Listings /></ProtectedRoute> },
-        { path: 'browse', element: <Browse /> },
-        { path: 'listing/:id', element: <ListingDetails /> },
-        { path: 'add', element: <ProtectedRoute><AddEditListing /></ProtectedRoute> },
-        { path: 'edit/:id', element: <ProtectedRoute><AddEditListing /></ProtectedRoute> },
-        { path: 'map', element: <MapPage /> },
-        { path: 'trends', element: <RentalTrends /> },
-  { path: 'compare-areas', element: <CompareAreas /> },
-// ...existing code...
-        { path: 'admin-panel/scraped-data', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><ScrapedData /></ProtectedAdminRoute></React.Suspense> },
-        { path: 'admin-panel/analytics', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><Analytics /></ProtectedAdminRoute></React.Suspense> },
         { path: 'report-form', element: <ProtectedRoute><ReportForm /></ProtectedRoute> },
         { path: 'reports', element: <ProtectedRoute><UserReports /></ProtectedRoute> },
         { path: 'profile', element: <ProtectedRoute><UserProfile /></ProtectedRoute> },
-        { path: '*', element: <Navigate to="/" /> }
-      ]
-    }
-// ...existing code...
-        { path: 'reports', element: <UserReports /> },
-        { path: 'profile', element: <UserProfile /> },
         { path: '*', element: <Navigate to="/" /> }
       ]
     }
@@ -638,6 +612,21 @@ function ProtectedAdminRoute({ children }) {
   }
   
   return children;
+}
+
+function ProtectedRoute({ children }) {
+    const { user, isLoading } = useAuth();
+    const location = useLocation();
+
+    if (isLoading) {
+        return <div>Loading...</div>; // Or a spinner
+    }
+
+    if (!user) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    return children;
 }
 
 export default function App() {
