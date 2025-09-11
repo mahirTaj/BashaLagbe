@@ -2,7 +2,7 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "frontend/build",
   "framework": "create-react-app",
-  "installCommand": "npm install",
+  "installCommand": "npm install --prefix frontend && npm install --prefix backend",
   "rewrites": [
   { "source": "/api/:path*", "destination": "/api" },
   { "source": "/(.*)", "destination": "/index.html" }
