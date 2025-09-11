@@ -41,6 +41,7 @@ import RentHeatmap from './pages/RentHeatmap';
 import UserReports from './pages/UserReports';
 import UserProfile from './pages/UserProfile';
 import ReportForm from './pages/ReportForm';
+import MenuIcon from '@mui/icons-material/Menu';
 
 // Lazy import to avoid circular dependency
 const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
@@ -122,6 +123,7 @@ function Nav() {
   const qParam = params.get('q') || '';
   const [searchVal, setSearchVal] = useState(qParam);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+  const [mobileMenuAnchor, setMobileMenuAnchor] = useState(null);
 
   // keep input synced when navigating back/forward
   useEffect(() => { if (qParam !== searchVal) setSearchVal(qParam); /* eslint-disable-next-line */ }, [qParam]);
@@ -156,6 +158,14 @@ function Nav() {
     setUserMenuAnchor(null);
   };
 
+  const handleMobileMenuOpen = (event) => {
+    setMobileMenuAnchor(event.currentTarget);
+  };
+
+  const handleMobileMenuClose = () => {
+    setMobileMenuAnchor(null);
+  };
+
   const handleLogout = () => {
     handleUserMenuClose();
     logout();
@@ -182,6 +192,60 @@ function Nav() {
       boxShadow: '0 10px 30px rgba(2,6,23,0.35)'
     }}>
       <Toolbar sx={{ px: { xs: 1.5, sm: 3 }, minHeight: '76px !important' }}>
+        {/* Mobile Menu */}
+        <Box sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }}>
+          <IconButton
+            size="large"
+            aria-label="open navigation menu"
+            aria-controls="mobile-menu"
+            aria-haspopup="true"
+            onClick={handleMobileMenuOpen}
+            color="inherit"
+          >
+            <MenuIcon />
+          </IconButton>
+          <Menu
+            id="mobile-menu"
+            anchorEl={mobileMenuAnchor}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            keepMounted
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+            open={Boolean(mobileMenuAnchor)}
+            onClose={handleMobileMenuClose}
+            sx={{
+              display: { xs: 'block', md: 'none' },
+            }}
+            PaperProps={{
+              sx: {
+                background: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95))',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(148,163,184,0.2)',
+                borderRadius: 2,
+                minWidth: 220,
+                color: 'white'
+              }
+            }}
+          >
+            <MenuItem onClick={() => { navigate('/'); handleMobileMenuClose(); }}>
+              <ViewListIcon sx={{ mr: 1.5 }} /> My Listings
+            </MenuItem>
+            <MenuItem onClick={() => { navigate('/browse'); handleMobileMenuClose(); }}>
+              <ExploreIcon sx={{ mr: 1.5 }} /> Browse
+            </MenuItem>
+            <MenuItem onClick={() => { navigate('/map'); handleMobileMenuClose(); }}>
+              <MapIcon sx={{ mr: 1.5 }} /> Map
+            </MenuItem>
+            <MenuItem onClick={() => { navigate('/trends'); handleMobileMenuClose(); }}>
+              <AssessmentIcon sx={{ mr: 1.5 }} /> Trends
+            </MenuItem>
+            {user && user.role === 'admin' && (
+              <MenuItem onClick={() => { navigate('/admin-panel'); handleMobileMenuClose(); }}>
+                 Admin Panel
+              </MenuItem>
+            )}
+          </Menu>
+        </Box>
+
         {/* Logo and Brand */}
         <LogoBox onClick={() => navigate('/')}> 
           <Box sx={{
@@ -207,8 +271,9 @@ function Nav() {
         </LogoBox>
 
         {/* Navigation Links */}
-        <Box sx={{ flexGrow: 1, display: 'flex', ml: 4 }}>
-          <NavButton startIcon={<ViewListIcon />} onClick={() => navigate('/')} data-active={location.pathname === '/'}>
+        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, ml: 4 }}>
+          <NavButton startIcon={<ViewListIcon />} onClick={() => navigate('/')} data-active={location.pathname === '/'}
+          >
             My Listings
           </NavButton>
           <NavButton startIcon={<ExploreIcon />} onClick={() => navigate('/browse')} data-active={location.pathname.startsWith('/browse')}>
@@ -466,7 +531,7 @@ function RootLayout() {
   return (
     <>
       <Nav />
-      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 1, sm: 2 } }}>
         <Outlet />
       </Box>
     </>

@@ -12,7 +12,7 @@ const empty = {
   type: 'Apartment',
   price: '',
   availableFrom: '',
-  propertytype: 'For Rent',
+  propertyType: 'For Rent',
   rooms: '',
   bathrooms: '',
   balcony: '',
@@ -342,6 +342,16 @@ export default function AddEditListing() {
                 <MenuItem value="Sublet">Sublet</MenuItem>
                 <MenuItem value="Commercial">Commercial</MenuItem>
                 <MenuItem value="Hostel">Hostel</MenuItem>
+              </Select>
+            </FormControl>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth required>
+              <InputLabel>Property Type</InputLabel>
+              <Select label="Property Type" name="propertyType" value={form.propertyType} onChange={onChange}>
+                <MenuItem value="For Rent">For Rent</MenuItem>
+                <MenuItem value="For Sale">For Sale</MenuItem>
               </Select>
             </FormControl>
             </Grid>
