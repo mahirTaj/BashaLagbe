@@ -2,8 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import jwtDecode from 'jwt-decode';
 
-// Configure axios base URL
-axios.defaults.baseURL = 'http://localhost:5000';
+// Configure axios base URL - use relative URLs in production, localhost in development
+const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000';
+axios.defaults.baseURL = API_BASE_URL;
 
 const AuthCtx = createContext(null);
 

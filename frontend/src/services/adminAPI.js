@@ -1,5 +1,5 @@
 // Admin API service for web scraping and data validation
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
 
 class AdminAPI {
   constructor() {
