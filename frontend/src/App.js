@@ -59,12 +59,16 @@ const Search = styled('div')(({ theme }) => ({
   marginLeft: theme.spacing(1),
   marginRight: theme.spacing(1),
   width: '100%',
-  '&:hover': { borderColor: 'rgba(148,163,184,0.4)' },
-  '&:focus-within': { borderColor: 'rgba(250,204,21,0.7)', background: 'rgba(250,204,21,0.06)' },
   [theme.breakpoints.up('sm')]: {
     marginLeft: theme.spacing(2),
     width: 'auto',
     minWidth: '320px',
+  },
+  [theme.breakpoints.down('sm')]: {
+    order: 3, // Move search to the end on mobile
+    marginTop: theme.spacing(1),
+    marginLeft: 0,
+    marginRight: 0,
   },
 }));
 
@@ -191,9 +195,14 @@ function Nav() {
       borderBottom: '1px solid rgba(148,163,184,0.2)',
       boxShadow: '0 10px 30px rgba(2,6,23,0.35)'
     }}>
-      <Toolbar sx={{ px: { xs: 1.5, sm: 3 }, minHeight: '76px !important' }}>
+      <Toolbar sx={{ 
+        px: { xs: 1.5, sm: 3 }, 
+        minHeight: '76px !important',
+        flexWrap: 'wrap', // Allow items to wrap on smaller screens
+        justifyContent: 'space-between', // Better alignment
+      }}>
         {/* Mobile Menu */}
-        <Box sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }}>
+        <Box sx={{ display: { xs: 'flex', md: 'none' }, mr: 1, order: 0 }}>
           <IconButton
             size="large"
             aria-label="open navigation menu"
@@ -243,11 +252,22 @@ function Nav() {
                  Admin Panel
               </MenuItem>
             )}
+            {!user && (
+              <div>
+                <Divider sx={{ borderColor: 'rgba(148,163,184,0.2)' }} />
+                <MenuItem onClick={() => { navigate('/login'); handleMobileMenuClose(); }}>
+                  Login
+                </MenuItem>
+                <MenuItem onClick={() => { navigate('/register'); handleMobileMenuClose(); }}>
+                  Get Started
+                </MenuItem>
+              </div>
+            )}
           </Menu>
         </Box>
 
         {/* Logo and Brand */}
-        <LogoBox onClick={() => navigate('/')}> 
+        <LogoBox onClick={() => navigate('/')} sx={{ order: 1 }}> 
           <Box sx={{
             width: 46, height: 46, borderRadius: '50%', padding: '2px',
             background: 'linear-gradient(135deg,#d4af37,#facc15)',
@@ -270,8 +290,11 @@ function Nav() {
           }}>BashaLagbe</Typography>
         </LogoBox>
 
+        {/* Spacer to push user/login to the right */}
+        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, order: 2 }} />
+
         {/* Navigation Links */}
-        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, ml: 4 }}>
+        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, ml: 4, order: 3 }}>
           <NavButton startIcon={<ViewListIcon />} onClick={() => navigate('/')} data-active={location.pathname === '/'}
           >
             My Listings
@@ -304,7 +327,7 @@ function Nav() {
         </Box>
 
         {/* Search */}
-        <Search>
+        <Search sx={{ order: { xs: 5, md: 4 } }}>
           <SearchIconWrapper>
             <SearchIcon />
           </SearchIconWrapper>
@@ -319,7 +342,7 @@ function Nav() {
         </Search>
 
         {/* User */}
-        <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', ml: { xs: 0, md: 2 }, order: { xs: 2, md: 5 } }}>
           {user ? (
             <>
               {/* Report Button */}
@@ -564,7 +587,33 @@ const router = createBrowserRouter(
         { path: 'admin-panel/data-validation', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><DataValidationInterface /></ProtectedAdminRoute></React.Suspense> },
         { path: 'admin-panel/scraped-data', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><ScrapedData /></ProtectedAdminRoute></React.Suspense> },
         { path: 'admin-panel/analytics', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><Analytics /></ProtectedAdminRoute></React.Suspense> },
-        { path: 'report-form', element: <ReportForm /> },
+        import ReportForm from './pages/ReportForm';
+import ProtectedRoute from './ProtectedRoute';
+import MenuIcon from '@mui/icons-material/Menu';
+
+// Lazy import to avoid circular dependency
+const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
+// ...existing code...
+      element: <RootLayout />,
+      children: [
+        { index: true, element: <ProtectedRoute><Listings /></ProtectedRoute> },
+        { path: 'browse', element: <Browse /> },
+        { path: 'listing/:id', element: <ListingDetails /> },
+        { path: 'add', element: <ProtectedRoute><AddEditListing /></ProtectedRoute> },
+        { path: 'edit/:id', element: <ProtectedRoute><AddEditListing /></ProtectedRoute> },
+        { path: 'map', element: <MapPage /> },
+        { path: 'trends', element: <RentalTrends /> },
+  { path: 'compare-areas', element: <CompareAreas /> },
+// ...existing code...
+        { path: 'admin-panel/scraped-data', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><ScrapedData /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'admin-panel/analytics', element: <React.Suspense fallback={<div>Loading...</div>}><ProtectedAdminRoute><Analytics /></ProtectedAdminRoute></React.Suspense> },
+        { path: 'report-form', element: <ProtectedRoute><ReportForm /></ProtectedRoute> },
+        { path: 'reports', element: <ProtectedRoute><UserReports /></ProtectedRoute> },
+        { path: 'profile', element: <ProtectedRoute><UserProfile /></ProtectedRoute> },
+        { path: '*', element: <Navigate to="/" /> }
+      ]
+    }
+// ...existing code...
         { path: 'reports', element: <UserReports /> },
         { path: 'profile', element: <UserProfile /> },
         { path: '*', element: <Navigate to="/" /> }
