@@ -157,7 +157,7 @@ async function startServer() {
   });
 
   // 6. START THE HTTP SERVER
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 5001;
   app.listen(PORT, () => {
     console.log(`🚀 Server is live and listening on port ${PORT}`);
     console.log(`✨ Environment: ${process.env.NODE_ENV || 'development'}`);
