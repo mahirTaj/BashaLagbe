@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Listing = require('../models/listings');
+const MarketSample = require('../models/MarketSample');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
@@ -600,11 +601,15 @@ router.delete('/:id', authenticate, async (req, res) => {
 // Get available areas and districts for filtering
 router.get('/trends/areas', async (req, res) => {
   try {
+    console.log('[listings/trends/areas] Starting areas fetch');
     const areas = await MarketSample.distinct('area');
+    console.log('[listings/trends/areas] Areas count:', areas.length);
     const districts = await MarketSample.distinct('district');
+    console.log('[listings/trends/areas] Districts count:', districts.length);
     // Also provide popular (by count) areas/districts from last 12 months to help frontends choose defaults that have data
     const since = new Date();
     since.setMonth(since.getMonth() - 12);
+    console.log('[listings/trends/areas] Since date:', since);
     const [popularAreasAgg, popularDistrictsAgg] = await Promise.all([
       MarketSample.aggregate([
         { $match: { createdAt: { $gte: since }, area: { $exists: true, $ne: '' } } },
@@ -621,6 +626,8 @@ router.get('/trends/areas', async (req, res) => {
         { $project: { _id: 0, name: '$_id' } }
       ])
     ]);
+    console.log('[listings/trends/areas] Popular areas count:', popularAreasAgg.length);
+    console.log('[listings/trends/areas] Popular districts count:', popularDistrictsAgg.length);
     res.json({
       areas: areas.filter(a => a).sort(),
       districts: districts.filter(d => d).sort(),
@@ -628,7 +635,7 @@ router.get('/trends/areas', async (req, res) => {
       popularDistricts: popularDistrictsAgg.map(d => d.name)
     });
   } catch (err) {
-    console.error('Areas fetch error', err);
+    console.error('[listings/trends/areas] Areas fetch error:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to fetch areas' });
   }
 });

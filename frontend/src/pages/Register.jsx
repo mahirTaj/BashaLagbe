@@ -27,7 +27,7 @@ export default function Register() {
           <Box component="form" onSubmit={handleSubmit}>
             <TextField fullWidth label="Name" sx={{ mb:2 }} value={name} onChange={(e)=>setName(e.target.value)} />
             <TextField fullWidth label="Email" sx={{ mb:2 }} value={email} onChange={(e)=>setEmail(e.target.value)} />
-            <TextField fullWidth label="Password" type="password" sx={{ mb:2 }} value={password} onChange={(e)=>setPassword(e.target.value)} />
+            <TextField fullWidth label="Password" type="password" sx={{ mb:2 }} value={password} onChange={(e)=>setPassword(e.target.value)} inputProps={{ autoComplete: 'new-password' }} />
             <TextField select fullWidth label="Role" sx={{ mb:2 }} value={role} onChange={(e)=>setRole(e.target.value)}>
               <MenuItem value="renter">Renter</MenuItem>
               <MenuItem value="owner">Owner</MenuItem>

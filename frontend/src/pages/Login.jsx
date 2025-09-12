@@ -24,7 +24,7 @@ export default function Login() {
           {error && <Alert severity="error" sx={{ mb:2 }}>{error}</Alert>}
           <Box component="form" onSubmit={handleSubmit}>
             <TextField fullWidth label="Email" sx={{ mb:2 }} value={email} onChange={(e)=>setEmail(e.target.value)} />
-            <TextField fullWidth label="Password" type="password" sx={{ mb:2 }} value={password} onChange={(e)=>setPassword(e.target.value)} />
+            <TextField fullWidth label="Password" type="password" sx={{ mb:2 }} value={password} onChange={(e)=>setPassword(e.target.value)} inputProps={{ autoComplete: 'current-password' }} />
             <Button type="submit" variant="contained">Login</Button>
             <Button sx={{ ml:2 }} onClick={()=>navigate('/register')}>Register</Button>
           </Box>
