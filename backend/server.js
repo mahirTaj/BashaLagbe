@@ -141,6 +141,8 @@ process.on('uncaughtException', (err) => {
 // Error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  // Log full error for debugging (includes stack)
+  try { console.error('[backend] GLOBAL ERROR:', err && err.stack ? err.stack : err); } catch (e) { console.error('[backend] Failed to log error', e); }
   if (err instanceof multer.MulterError) {
     return res.status(413).json({ error: 'Upload too large', code: err.code });
   }
