@@ -1,7 +1,32 @@
 // NOTE: This file mirrors the root server.js for cases where a platform start command points here.
 // Prefer using the root-level server.js to avoid duplication.
 
-require('dotenv').config();
+// Load environment variables.
+// If the process is started from the backend folder, prefer loading the workspace root `.env`
+// so shared secrets (MONGO_URI, CLOUDINARY_*) defined at project root are available.
+try {
+  const path = require('path');
+  const dotenv = require('dotenv');
+  // Attempt to load root .env first (one level up)
+  const rootEnv = path.resolve(__dirname, '..', '.env');
+  const backendEnv = path.resolve(__dirname, '.env');
+  let loaded = false;
+  try {
+    const r = dotenv.config({ path: rootEnv });
+    if (!r.error) { console.log('[backend] Loaded env from workspace root .env'); loaded = true; }
+  } catch (e) {}
+  // Always also try to load backend/.env so local overrides work
+  try {
+    const b = dotenv.config({ path: backendEnv });
+    if (!b.error) { console.log('[backend] Loaded env from backend/.env'); loaded = true; }
+  } catch (e) {}
+  if (!loaded) {
+    // Fallback to default behavior (dotenv will look for .env in cwd)
+    try { dotenv.config(); } catch (e) {}
+  }
+} catch (e) {
+  // If dotenv isn't available for some reason, proceed — process.env may already be set in the environment
+}
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');

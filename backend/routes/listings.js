@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Listing = require('../models/listings');
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { cloudinary, upload } = require('../config/cloudinary');
+const { cloudinary, upload, useCloudinary } = require('../config/cloudinary');
 
 // Helper to extract Cloudinary public ID from a URL
 function getPublicIdFromUrl(url) {
@@ -19,19 +21,53 @@ function getPublicIdFromUrl(url) {
 }
 
 // Create listing (requires authenticated owner)
-router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
-    try {
+// Lightweight middleware that runs before multer to help determine whether multer/cloudinary fails
+function preMulterDebug(req, res, next) {
+  try {
+    console.log('[listings] preMulterDebug headers.authorization=', !!req.headers.authorization ? '[present]' : '[missing]', 'content-type=', req.get('content-type'));
+  } catch (e) {
+    console.log('[listings] preMulterDebug failed', e);
+  }
+  next();
+}
+
+router.post('/', authenticate, preMulterDebug, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+  try {
     // Debug: log incoming files and a small portion of body to help troubleshoot upload errors
-    try { console.log('Create listing incoming:', { files: Object.keys(req.files || {}).reduce((acc, k) => ({ ...acc, [k]: (req.files[k] || []).length }), {}), bodyKeys: Object.keys(req.body || {}).slice(0,10) }); } catch (e) { console.log('Create listing debug log failed', e); }
+    try { console.log('[listings] Create listing incoming:', { files: Object.keys(req.files || {}).reduce((acc, k) => ({ ...acc, [k]: (req.files[k] || []).length }), {}), bodyKeys: Object.keys(req.body || {}).slice(0,10) }); } catch (e) { console.log('[listings] Create listing debug log failed', e); }
         const userId = req.auth?.userId;
         if (!userId) {
             return res.status(401).json({ error: 'Authentication failed: User ID not found.' });
         }
 
-        const photoUrls = (req.files?.photos || []).map((f) => f.path);
-        const videoUrl = req.files?.video?.[0] ? req.files.video[0].path : '';
+    // Build accessible URLs depending on whether Cloudinary is configured
+    const photoFiles = (req.files?.photos || []);
+    const photoUrls = photoFiles.map((f) => {
+      if (useCloudinary) return f.path; // cloudinary returns full https path in path
+      // local disk: serve via /uploads
+      return `/uploads/${f.filename || f.path.split(/[\\/]/).pop()}`;
+    });
+    const videoFile = req.files?.video?.[0];
+    const videoUrl = videoFile ? (useCloudinary ? videoFile.path : `/uploads/${videoFile.filename || videoFile.path.split(/[\\/]/).pop()}`) : '';
 
-        // Basic required validations
+  // Debug incoming propertyType
+  try { console.log('[listings] incoming propertyType raw =', JSON.stringify(req.body.propertyType)); } catch (e) {}
+  // Normalize propertyType input (accept common values and map to schema enum)
+    try {
+      const ptRaw = (req.body.propertyType || '').toString().trim().toLowerCase();
+      if (ptRaw) {
+        if (['rent','for rent','for_rent','forrent','rental'].includes(ptRaw)) {
+          req.body.propertyType = 'For Rent';
+        } else if (['sale','for sale','forsale'].includes(ptRaw)) {
+          req.body.propertyType = 'For Sale';
+        } else {
+          // preserve original casing if it's already in a valid form
+          req.body.propertyType = req.body.propertyType;
+        }
+      }
+    } catch (e) { console.warn('[listings] propertyType normalization failed', e); }
+
+    // Basic required validations
         const missing = [];
         if (!req.body.title || !req.body.title.trim()) missing.push('title');
         if (req.body.price === undefined || req.body.price === '') missing.push('price');
@@ -94,6 +130,16 @@ router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, 
   } catch (err) {
     // Ensure we log full error object and stack for debugging
     try { console.error('Create listing error:', err, '\nstack:\n', err && err.stack); } catch (e) { console.error('Failed to log error object', e); }
+    // Also append the full stack to a persistent log so we can inspect it even when console output isn't visible
+    try {
+      const logsDir = path.join(__dirname, '..', 'logs');
+      try { fs.mkdirSync(logsDir, { recursive: true }); } catch (e) {}
+      const logPath = path.join(logsDir, 'listing_errors.log');
+      const entry = `${new Date().toISOString()} - ERROR creating listing:\n${(err && (err.stack || err.message)) || JSON.stringify(err)}\n\n`;
+      fs.appendFileSync(logPath, entry, { encoding: 'utf8' });
+    } catch (e) {
+      console.error('Failed to append listing error to file:', e);
+    }
     // If the error has a message, return it; otherwise return generic
     res.status(500).json({ error: (err && err.message) || 'Server error' });
   }
@@ -397,7 +443,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Update listing (requires authenticated owner of the listing)
-router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+router.put('/:id', authenticate, preMulterDebug, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.auth?.userId;
@@ -428,13 +474,20 @@ router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }
             return res.status(400).json({ error: 'Invalid format for existingPhotoUrls.' });
         }
 
-        const urlsToDelete = listing.photoUrls.filter(url => !existingPhotoUrls.includes(url));
-        for (const url of urlsToDelete) {
-            const publicId = getPublicIdFromUrl(url);
-            if (publicId) {
-                await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
-            }
-        }
+    const urlsToDelete = listing.photoUrls.filter(url => !existingPhotoUrls.includes(url));
+    for (const url of urlsToDelete) {
+      const publicId = getPublicIdFromUrl(url);
+      if (useCloudinary && publicId && cloudinary) {
+        try { await cloudinary.uploader.destroy(publicId, { resource_type: 'image' }); } catch (e) { console.error('Failed to destroy cloud image', e); }
+      } else {
+        // If local file, attempt unlink
+        try {
+          const filename = url.split('/').pop();
+          const fp = require('path').join(__dirname, '..', 'uploads', filename);
+          require('fs').unlinkSync(fp);
+        } catch (e) { /* ignore */ }
+      }
+    }
 
         const finalPhotoUrls = [...existingPhotoUrls, ...newPhotoUrls];
 
@@ -456,8 +509,17 @@ router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }
             finalVideoUrl = '';
         }
         
-        const updatePayload = {
-            ...req.body,
+    // Normalize propertyType for update as well
+    try {
+      const ptRawU = (req.body.propertyType || '').toString().trim().toLowerCase();
+      if (ptRawU) {
+        if (['rent','for rent','for_rent','forrent','rental'].includes(ptRawU)) req.body.propertyType = 'For Rent';
+        else if (['sale','for sale','forsale'].includes(ptRawU)) req.body.propertyType = 'For Sale';
+      }
+    } catch (e) { console.warn('[listings] propertyType (update) normalization failed', e); }
+
+    const updatePayload = {
+      ...req.body,
             price: Number(req.body.price) || 0,
             rooms: Number(req.body.rooms) || 0,
             bathrooms: Number(req.body.bathrooms) || 0,
