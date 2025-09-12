@@ -1,10 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from './config/axios';
 import jwtDecode from 'jwt-decode';
-
-// Configure axios base URL - use relative URLs in production, localhost in development
-const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000';
-axios.defaults.baseURL = API_BASE_URL;
 
 const AuthCtx = createContext(null);
 
@@ -16,7 +12,6 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('authToken');
     const expiry = localStorage.getItem('authTokenExpiry');
     if (token && expiry && Number(expiry) > Date.now()) {
-      // Removed: axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       try {
         const decoded = jwtDecode(token);
         setUser({ id: decoded.sub, role: decoded.role });
@@ -31,14 +26,13 @@ export function AuthProvider({ children }) {
 
   const register = async ({ name, email, password, role }) => {
     try {
-      const res = await axios.post('/api/auth/register', { name, email, password, role });
+      const res = await apiClient.post('/api/auth/register', { name, email, password, role });
       const { token, user } = res.data || {};
       if (token) {
         let expiry = Date.now() + 24 * 60 * 60 * 1000;
         try { const d = jwtDecode(token); if (d && d.exp) expiry = d.exp * 1000; } catch {}
         localStorage.setItem('authToken', token);
         localStorage.setItem('authTokenExpiry', expiry.toString());
-        // Removed: axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setUser(user);
         return true;
       }
@@ -50,14 +44,13 @@ export function AuthProvider({ children }) {
 
   const login = async ({ email, password }) => {
     try {
-      const res = await axios.post('/api/auth/login', { email, password });
+      const res = await apiClient.post('/api/auth/login', { email, password });
       const { token, user } = res.data || {};
       if (token) {
         let expiry = Date.now() + 24 * 60 * 60 * 1000;
         try { const d = jwtDecode(token); if (d && d.exp) expiry = d.exp * 1000; } catch {}
         localStorage.setItem('authToken', token);
         localStorage.setItem('authTokenExpiry', expiry.toString());
-        // Removed: axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setUser(user);
         return true;
       }
@@ -70,12 +63,8 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authTokenExpiry');
-    // Removed: delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };
-
-  // Remove global 401 interceptor that was causing automatic logout
-  // Individual components can handle 401s as needed
 
   return (
     <AuthCtx.Provider value={{ user, isLoading, register, login, logout }}>
