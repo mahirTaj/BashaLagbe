@@ -12,11 +12,9 @@ const rateLimit = require('express-rate-limit');
 // Import database connection
 const { connectDB, isDBConnected, getConnectionState, getConnectionInfo, closeDB } = require('./backend/config/db');
 
-// Import routes AFTER database connection is established
-const authRoutes = require('./backend/routes/auth');
-const listingsRoutes = require('./backend/routes/listings');
-const adminRoutes = require('./backend/routes/admin');
-const trendsRoutes = require('./backend/routes/trends');
+// NOTE: Do NOT require route modules at top-level. Requiring them can execute
+// code (and Mongoose queries) immediately which may run before the DB is ready.
+// We'll require and mount routes after the DB connection succeeds inside startServer().
 
 const app = express();
 
@@ -140,16 +138,22 @@ async function startServer() {
       });
     });
 
-    // 8. REGISTER API ROUTES AFTER DB CONNECTION
-    console.log('📋 Registering API routes...');
+  // 8. REGISTER API ROUTES AFTER DB CONNECTION
+  console.log('📋 Registering API routes...');
 
-    // Apply DB connection check to all API routes
-    app.use('/api/auth', checkDBConnection, authRoutes);
-    app.use('/api/listings', checkDBConnection, listingsRoutes);
-    app.use('/api/admin', checkDBConnection, adminRoutes);
-    app.use('/api/trends', checkDBConnection, trendsRoutes);
+  // Require routes here (after DB is connected) to avoid top-level queries
+  const authRoutes = require('./backend/routes/auth');
+  const listingsRoutes = require('./backend/routes/listings');
+  const adminRoutes = require('./backend/routes/admin');
+  const trendsRoutes = require('./backend/routes/trends');
 
-    console.log('✅ API routes registered successfully');
+  // Apply DB connection check to all API routes
+  app.use('/api/auth', checkDBConnection, authRoutes);
+  app.use('/api/listings', checkDBConnection, listingsRoutes);
+  app.use('/api/admin', checkDBConnection, adminRoutes);
+  app.use('/api/trends', checkDBConnection, trendsRoutes);
+
+  console.log('✅ API routes registered successfully');
 
     // 9. SERVE STATIC ASSETS AND FRONTEND
     // Serve static files from uploads directory

@@ -52,11 +52,8 @@ async function connectDB() {
       // Buffer management (removed deprecated bufferMaxEntries)
       bufferCommands: false,
 
-      // Modern options for Mongoose 6+ (these are now default but explicit is better)
-      // Note: useNewUrlParser and useUnifiedTopology are deprecated but still work in 6.x
-      // They will be removed in Mongoose 7+, but for now they ensure compatibility
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+  // Modern options for Mongoose 6+ (defaults cover parsing and topology)
+  // Removed deprecated driver-specific options: useNewUrlParser and useUnifiedTopology
 
       // Heartbeat and monitoring
       heartbeatFrequencyMS: 10000,
@@ -74,7 +71,7 @@ async function connectDB() {
     });
 
     // Attempt connection
-    await mongoose.connect(mongoURI, connectionOptions);
+      await mongoose.connect(mongoURI, connectionOptions);
 
     isConnected = true;
     connectionAttempts = 0;
