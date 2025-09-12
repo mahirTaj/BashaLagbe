@@ -7,9 +7,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 
-// Import database connection
+// Import database connection (Mongoose 6+ compatible)
 const { connectDB, isDBConnected, getConnectionState, getConnectionInfo, closeDB } = require('./backend/config/db');
 
 // Import routes AFTER database connection is established
@@ -23,8 +22,8 @@ const app = express();
 // --- Centralized Asynchronous Startup Function ---
 async function startServer() {
   try {
-    // 1. CONNECT TO DATABASE FIRST
-    console.log('� Starting application...');
+    // 1. CONNECT TO DATABASE FIRST (REQUIRED FOR MONGOOSE 6+)
+    console.log('🚀 Starting MERN application...');
     console.log('🔄 Connecting to MongoDB...');
 
     const dbConnected = await connectDB();
@@ -33,10 +32,30 @@ async function startServer() {
     }
 
     console.log('✅ Database connection established');
-    console.log('� Configuring Express server...');
+    console.log('🔧 Configuring Express server...');
 
     // 2. CONFIGURE EXPRESS MIDDLEWARE
-  
+
+    // Trust proxy for deployment environments like Render/Heroku
+    app.set('trust proxy', 1);
+
+    // Security, Compression, and Logging
+    app.use(helmet({
+      contentSecurityPolicy: process.env.DISABLE_CSP === 'true' ? false : {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          imgSrc: ["'self'", "data:", "https:", "blob:"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          connectSrc: ["'self'", "https://api.mapbox.com", "ws:"]
+        }
+      },
+      crossOriginEmbedderPolicy: false
+    }));
+    app.use(compression());
+    app.use(morgan('dev'));
+
     // 3. CONFIGURE CORS FOR DEPLOYMENT
     const corsOptions = {
       origin: function (origin, callback) {
@@ -100,6 +119,7 @@ async function startServer() {
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     // 5. RATE LIMITING (optional - commented out for development)
+    // const rateLimit = require('express-rate-limit');
     // const apiLimiter = rateLimit({
     //   windowMs: 15 * 60 * 1000, // 15 minutes
     //   max: 100,
@@ -199,6 +219,7 @@ async function startServer() {
       console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Database: ${getConnectionState()}`);
       console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🔧 Mongoose version: ${getConnectionInfo().mongooseVersion}`);
     });
 
     // Handle server errors
@@ -221,7 +242,9 @@ async function startServer() {
       process.exit(1);
     }
   }
-}// --- GRACEFUL SHUTDOWN ---
+}
+
+// --- GRACEFUL SHUTDOWN ---
 process.on('SIGTERM', async () => {
   console.log('\n⏹️ SIGTERM received, shutting down gracefully...');
   try {

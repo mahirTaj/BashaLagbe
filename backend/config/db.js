@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 /**
- * MongoDB Connection Configuration
+ * MongoDB Connection Configuration for Mongoose 6+
  * Optimized for cloud deployment with proper error handling and timeouts
  */
 
@@ -17,6 +17,7 @@ const MAX_CONNECTION_ATTEMPTS = 5;
 
 /**
  * Connect to MongoDB with proper async/await and error handling
+ * Compatible with Mongoose 6+ and Node.js
  * @returns {Promise<boolean>} Connection success status
  */
 async function connectDB() {
@@ -30,15 +31,16 @@ async function connectDB() {
     console.log('🔄 Attempting MongoDB connection...');
     console.log(`📍 MongoDB URI: ${mongoURI.substring(0, 20)}...`);
     console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📦 Mongoose version: ${mongoose.version}`);
 
-    // Cloud deployment optimized connection options
+    // Mongoose 6+ optimized connection options (modern approach)
     const connectionOptions = {
-      // Connection pooling
+      // Connection pooling (Mongoose 6+ defaults)
       maxPoolSize: 10,
       minPoolSize: 2,
 
       // Timeouts optimized for cloud deployment
-      serverSelectionTimeoutMS: 30000, // Increased from default 30000ms
+      serverSelectionTimeoutMS: 30000, // 30 seconds for server selection
       socketTimeoutMS: 45000,
       connectTimeoutMS: 30000,
       maxIdleTimeMS: 30000,
@@ -47,18 +49,29 @@ async function connectDB() {
       retryWrites: true,
       retryReads: true,
 
-      // Buffer management
+      // Buffer management (removed deprecated bufferMaxEntries)
       bufferCommands: false,
-      bufferMaxEntries: 0,
 
-      // Legacy options for compatibility
+      // Modern options for Mongoose 6+ (these are now default but explicit is better)
+      // Note: useNewUrlParser and useUnifiedTopology are deprecated but still work in 6.x
+      // They will be removed in Mongoose 7+, but for now they ensure compatibility
       useNewUrlParser: true,
       useUnifiedTopology: true,
 
       // Heartbeat and monitoring
       heartbeatFrequencyMS: 10000,
       maxStalenessSeconds: 90,
+
+      // Additional cloud deployment options
+      family: 4, // Use IPv4, skip trying IPv6
     };
+
+    console.log('⚙️ Connection options:', {
+      maxPoolSize: connectionOptions.maxPoolSize,
+      serverSelectionTimeoutMS: connectionOptions.serverSelectionTimeoutMS,
+      useNewUrlParser: connectionOptions.useNewUrlParser,
+      useUnifiedTopology: connectionOptions.useUnifiedTopology
+    });
 
     // Attempt connection
     await mongoose.connect(mongoURI, connectionOptions);
@@ -69,6 +82,8 @@ async function connectDB() {
     console.log('✅ MongoDB connected successfully!');
     console.log(`🔗 Connection state: ${mongoose.connection.readyState}`);
     console.log(`📊 Connection pool size: ${connectionOptions.maxPoolSize}`);
+    console.log(`🏠 Database name: ${mongoose.connection.name}`);
+    console.log(`🌐 Host: ${mongoose.connection.host}:${mongoose.connection.port}`);
 
     // Set up connection event handlers
     setupConnectionEventHandlers();
@@ -82,10 +97,14 @@ async function connectDB() {
     console.error('❌ MongoDB connection failed:');
     console.error(`   Error: ${error.message}`);
     console.error(`   Attempt: ${connectionAttempts}/${MAX_CONNECTION_ATTEMPTS}`);
+    console.error(`   Error name: ${error.name}`);
 
     // Log additional error details in development
     if (process.env.NODE_ENV !== 'production') {
       console.error('   Full error:', error);
+      if (error.reason) {
+        console.error('   Reason:', error.reason);
+      }
     }
 
     // Retry logic for production
@@ -149,6 +168,20 @@ function setupConnectionEventHandlers() {
     console.error('❌ MongoDB reconnection failed after multiple attempts');
     isConnected = false;
   });
+
+  // Additional event handlers for better monitoring
+  mongoose.connection.on('connecting', () => {
+    console.log('🔄 MongoDB connecting...');
+  });
+
+  mongoose.connection.on('disconnecting', () => {
+    console.log('🔌 MongoDB disconnecting...');
+  });
+
+  mongoose.connection.on('close', () => {
+    console.log('🔒 MongoDB connection closed');
+    isConnected = false;
+  });
 }
 
 /**
@@ -174,6 +207,22 @@ function getConnectionState() {
 }
 
 /**
+ * Get connection information
+ * @returns {object} Connection details
+ */
+function getConnectionInfo() {
+  return {
+    readyState: mongoose.connection.readyState,
+    state: getConnectionState(),
+    name: mongoose.connection.name,
+    host: mongoose.connection.host,
+    port: mongoose.connection.port,
+    isConnected: isConnected,
+    mongooseVersion: mongoose.version
+  };
+}
+
+/**
  * Gracefully close MongoDB connection
  * @returns {Promise<void>}
  */
@@ -194,6 +243,7 @@ module.exports = {
   connectDB,
   isDBConnected,
   getConnectionState,
+  getConnectionInfo,
   closeDB,
   mongoose
 };
