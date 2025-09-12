@@ -111,12 +111,32 @@ async function init() {
 function start() {
   if (started) return; started = true;
   const port = process.env.PORT || 5000;
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`[backend] 🚀 Listening on ${port} (dbState=${mongoose.connection.readyState})`);
-  });
+  try {
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`[backend] 🚀 Listening on ${port} (dbState=${mongoose.connection.readyState})`);
+    });
+    server.on('error', (err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.error(`[backend] 🚫 Port ${port} already in use. Another process may be running.`);
+        // Do not crash the process; leave connection retry logic (if any) to the caller.
+      } else {
+        console.error('[backend] Server error:', err);
+      }
+    });
+  } catch (err) {
+    console.error('[backend] Failed to start server:', err);
+  }
 }
 
 init();
+
+// Global error handlers to improve debugging during development
+process.on('unhandledRejection', (reason, p) => {
+  console.error('[backend] UNHANDLED REJECTION at:', p, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[backend] UNCAUGHT EXCEPTION:', err);
+});
 
 // Error handler
 // eslint-disable-next-line no-unused-vars
