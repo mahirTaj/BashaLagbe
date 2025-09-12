@@ -8,15 +8,11 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const mongoose = require('mongoose');
 
-// ---- Mongoose Global Configuration ----
-// Disable command buffering to control readiness explicitly
-mongoose.set('bufferCommands', false);
-// Disable buffering timeout to prevent the 10000ms error
-mongoose.set('bufferTimeoutMS', 0);
+// Import database connection
+const { connectDB, isDBConnected, getConnectionState, closeDB } = require('./backend/config/db');
 
-// Import routes (it's safe to import them here)
+// Import routes AFTER database connection is established
 const authRoutes = require('./backend/routes/auth');
 const listingsRoutes = require('./backend/routes/listings');
 const adminRoutes = require('./backend/routes/admin');
@@ -26,153 +22,222 @@ const app = express();
 
 // --- Centralized Asynchronous Startup Function ---
 async function startServer() {
-  // 1. CONNECT TO DATABASE (with retry logic)
-  const mongoURI = process.env.MONGO_URI;
-  if (!mongoURI) {
-    console.error('❌ MONGO_URI is not set. Server cannot start.');
-    process.exit(1);
-  }
+  try {
+    // 1. CONNECT TO DATABASE FIRST
+    console.log('� Starting application...');
+    console.log('🔄 Connecting to MongoDB...');
 
-  const connectWithRetry = async () => {
-    try {
-      console.log('🔄 Attempting MongoDB connection...');
-      await mongoose.connect(mongoURI, {
-        maxPoolSize: 10, // Increased pool size for better concurrency
-        serverSelectionTimeoutMS: 15000, // Longer timeout for cold starts
-        socketTimeoutMS: 45000, // Longer socket timeout
-        connectTimeoutMS: 20000, // Longer connection timeout
-        retryWrites: true,
-      });
-      console.log('✅ MongoDB connected successfully.');
-    } catch (err) {
-      console.error('❌ MongoDB connection error:', err.message);
-      console.log('⏳ Retrying connection in 5 seconds...');
-      setTimeout(connectWithRetry, 5000); // Retry after 5s
+    const dbConnected = await connectDB();
+    if (!dbConnected) {
+      throw new Error('Failed to connect to MongoDB');
     }
-  };
 
-  mongoose.connection.on('disconnected', () => {
-    console.warn('🚨 MongoDB disconnected! Attempting to reconnect...');
-    connectWithRetry();
-  });
+    console.log('✅ Database connection established');
+    console.log('� Configuring Express server...');
 
-  await connectWithRetry(); // Initial connection attempt
-
-  // 2. CONFIGURE EXPRESS MIDDLEWARE (after DB connection is initiated)
+    // 2. CONFIGURE EXPRESS MIDDLEWARE
   
-  // Trust proxy for deployment environments like Render/Heroku
-  app.set('trust proxy', 1);
+    // 3. CONFIGURE CORS FOR DEPLOYMENT
+    const corsOptions = {
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
 
-  // Security, Compression, and Logging
-  app.use(helmet({
-    contentSecurityPolicy: process.env.DISABLE_CSP === 'true' ? false : {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts if needed, otherwise remove 'unsafe-inline'
-        connectSrc: ["'self'", "https://api.mapbox.com", "ws:"] // Allow websocket connections
+        const allowedOrigins = [];
+
+        // Development origins
+        if (process.env.NODE_ENV !== 'production') {
+          allowedOrigins.push(
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://127.0.0.1:3000',
+            'http://localhost:5173', // Vite dev server
+            'http://localhost:8080'  // Alternative dev port
+          );
+        }
+
+        // Production origins - dynamically configured
+        if (process.env.NODE_ENV === 'production') {
+          // Add your production frontend URLs
+          allowedOrigins.push(
+            'https://bashalagbe.onrender.com',
+            'https://bashalagbe.vercel.app',
+            'https://bashalagbe.netlify.app'
+          );
+
+          // Add custom client URL from environment
+          if (process.env.CLIENT_URL) {
+            allowedOrigins.push(process.env.CLIENT_URL);
+          }
+
+          // Allow all subdomains of your domain (if using custom domain)
+          if (process.env.ALLOWED_DOMAINS) {
+            const domains = process.env.ALLOWED_DOMAINS.split(',');
+            domains.forEach(domain => {
+              const cleanDomain = domain.trim();
+              allowedOrigins.push(`https://${cleanDomain}`, `https://www.${cleanDomain}`);
+            });
+          }
+        }
+
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          console.log('🚫 CORS blocked origin:', origin);
+          console.log('📋 Allowed origins:', allowedOrigins);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true,
+      optionsSuccessStatus: 200,
+      allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id', 'Accept', 'Origin', 'X-Requested-With'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
+    };
+    app.use(cors(corsOptions));
+
+    // 4. BODY PARSERS - Ensure express.json() is configured
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    // 5. RATE LIMITING (optional - commented out for development)
+    // const apiLimiter = rateLimit({
+    //   windowMs: 15 * 60 * 1000, // 15 minutes
+    //   max: 100,
+    //   message: 'Too many requests from this IP, please try again after 15 minutes.'
+    // });
+    // app.use('/api/', apiLimiter);
+
+    // 6. MIDDLEWARE TO CHECK DB CONNECTION
+    const checkDBConnection = (req, res, next) => {
+      if (!isDBConnected()) {
+        console.error('🚫 Database not connected for request:', req.path);
+        return res.status(503).json({
+          message: 'Service unavailable: Database not connected.',
+          dbState: getConnectionState()
+        });
       }
-    },
-    crossOriginEmbedderPolicy: false
-  }));
-  app.use(compression());
-  app.use(morgan('dev')); // Use 'dev' for cleaner logs, 'combined' for production
+      next();
+    };
 
-  // CORS configuration
-  const corsOptions = {
-    origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.CLIENT_URL, 'https://bashalagbe.onrender.com'] // Add your production URL
-      : ['http://localhost:3000', 'http://localhost:3001'],
-    credentials: true,
-    optionsSuccessStatus: 200,
-    allowedHeaders: ['Content-Type', 'Authorization', 'admin-token', 'x-user-id']
-  };
-  app.use(cors(corsOptions));
+    // 7. HEALTH CHECK ENDPOINT
+    app.get('/api/health', (req, res) => {
+      res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        dbState: getConnectionState(),
+        dbConnected: isDBConnected(),
+        environment: process.env.NODE_ENV || 'development',
+        uptime: process.uptime()
+      });
+    });
 
-  // Rate limiting
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
-    message: 'Too many requests from this IP, please try again after 15 minutes.'
-  });
-  app.use('/api/', apiLimiter); // Apply rate limiter only to API routes
+    // 8. REGISTER API ROUTES AFTER DB CONNECTION
+    console.log('📋 Registering API routes...');
 
-  // Body Parsers
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    // Apply DB connection check to all API routes
+    app.use('/api/auth', checkDBConnection, authRoutes);
+    app.use('/api/listings', checkDBConnection, listingsRoutes);
+    app.use('/api/admin', checkDBConnection, adminRoutes);
+    app.use('/api/trends', checkDBConnection, trendsRoutes);
 
-  // 3. DEFINE API ROUTES
-  
-  // Health check endpoint (does not need DB connection)
-  app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
+    console.log('✅ API routes registered successfully');
 
-  // Middleware to check for DB connection on all subsequent API routes
-  const checkDBConnection = (req, res, next) => {
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ message: 'Service unavailable: Database not connected.' });
+    // 9. SERVE STATIC ASSETS AND FRONTEND
+    // Serve static files from uploads directory
+    app.use('/uploads', express.static(path.join(__dirname, 'backend/uploads')));
+
+    // Serve React frontend for production
+    if (process.env.NODE_ENV === 'production') {
+      const buildPath = path.join(__dirname, 'frontend/build');
+      app.use(express.static(buildPath));
+
+      // Handle React routing, return all non-API requests to React app
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(buildPath, 'index.html'));
+      });
     }
-    next();
-  };
-  app.use('/api', checkDBConnection); // Apply to all /api routes
 
-  // Register API routes
-  app.use('/api/auth', authRoutes);
-  app.use('/api/listings', listingsRoutes);
-  app.use('/api/admin', adminRoutes);
-  app.use('/api/trends', trendsRoutes);
-
-  // 4. SERVE STATIC ASSETS AND FRONTEND
-  
-  // Serve static files from uploads directory
-  app.use('/uploads', express.static(path.join(__dirname, 'backend/uploads')));
-
-  // Serve React frontend for production
-  if (process.env.NODE_ENV === 'production') {
-    const buildPath = path.join(__dirname, 'frontend/build');
-    app.use(express.static(buildPath));
-    // Handle React routing, return all non-API requests to React app
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(buildPath, 'index.html'));
+    // 10. ERROR HANDLING
+    // 404 Not Found for any unhandled API routes
+    app.use('/api/*', (req, res) => {
+      res.status(404).json({ message: 'API route not found' });
     });
+
+    // Global error handler
+    app.use((err, req, res, next) => {
+      console.error('🚨 UNHANDLED ERROR:', err);
+
+      // Handle CORS errors specifically
+      if (err.message === 'Not allowed by CORS') {
+        return res.status(403).json({
+          message: 'CORS policy violation',
+          error: 'Origin not allowed'
+        });
+      }
+
+      res.status(500).json({
+        message: 'Internal Server Error',
+        error: process.env.NODE_ENV === 'production' ? undefined : err.message,
+      });
+    });
+
+    // 11. START THE HTTP SERVER ONLY AFTER EVERYTHING IS READY
+    const PORT = process.env.PORT || 5000;
+    console.log(`🚀 Starting server on port ${PORT}...`);
+
+    const server = app.listen(PORT, () => {
+      console.log(`✅ Server is live and listening on port ${PORT}`);
+      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔗 Database: ${getConnectionState()}`);
+      console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+    });
+
+    // Handle server errors
+    server.on('error', (err) => {
+      console.error('🚨 Server error:', err);
+      process.exit(1);
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    console.error('Full error:', error);
+
+    // In production, attempt restart after delay
+    if (process.env.NODE_ENV === 'production') {
+      console.log('🔄 Attempting server restart in 10 seconds...');
+      setTimeout(() => {
+        startServer();
+      }, 10000);
+    } else {
+      process.exit(1);
+    }
   }
-
-  // 5. CONFIGURE ERROR HANDLING
-  
-  // 404 Not Found for any unhandled API routes
-  app.use('/api/*', (req, res) => {
-    res.status(404).json({ message: 'API route not found' });
-  });
-
-  // Global error handler
-  app.use((err, req, res, next) => {
-    console.error('🚨 UNHANDLED ERROR:', err);
-    res.status(500).json({
-      message: 'Internal Server Error',
-      error: process.env.NODE_ENV === 'production' ? undefined : err.message,
-    });
-  });
-
-  // 6. START THE HTTP SERVER
-  const PORT = process.env.PORT || 5001;
-  app.listen(PORT, () => {
-    console.log(`🚀 Server is live and listening on port ${PORT}`);
-    console.log(`✨ Environment: ${process.env.NODE_ENV || 'development'}`);
-  });
-}
-
-// --- GRACEFUL SHUTDOWN ---
-const shutdown = async (signal) => {
-  console.log(`\n⏹️ ${signal} received, shutting down gracefully...`);
-  await mongoose.connection.close();
-  console.log('🔌 MongoDB connection closed.');
+}// --- GRACEFUL SHUTDOWN ---
+process.on('SIGTERM', async () => {
+  console.log('\n⏹️ SIGTERM received, shutting down gracefully...');
+  try {
+    await closeDB();
+    console.log('🔌 MongoDB connection closed.');
+  } catch (error) {
+    console.error('❌ Error closing database:', error.message);
+  }
   process.exit(0);
-};
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+});
+
+process.on('SIGINT', async () => {
+  console.log('\n⏹️ SIGINT received, shutting down gracefully...');
+  try {
+    await closeDB();
+    console.log('🔌 MongoDB connection closed.');
+  } catch (error) {
+    console.error('❌ Error closing database:', error.message);
+  }
+  process.exit(0);
+});
 
 // --- KICK OFF THE APPLICATION ---
-startServer();
+console.log('🚀 Starting Basha Lagbe application...');
+startServer().catch((error) => {
+  console.error('❌ Failed to start application:', error.message);
+  process.exit(1);
+});

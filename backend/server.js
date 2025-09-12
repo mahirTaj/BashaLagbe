@@ -179,4 +179,9 @@ app.use((err, req, res, next) => {
 process.on('SIGTERM', async () => { await mongoose.connection.close(); process.exit(0); });
 process.on('SIGINT', async () => { console.log('SIGINT received, ignoring'); await mongoose.connection.close(); });
 
+// Only start the server if this file is run directly (not imported as a module)
+if (require.main === module) {
+  init();
+}
+
 
