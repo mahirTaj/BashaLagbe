@@ -128,6 +128,8 @@ app.use((err, req, res, next) => {
   next();
 });
 
+
 process.on('SIGTERM', async () => { await mongoose.connection.close(); process.exit(0); });
-process.on('SIGINT', async () => { await mongoose.connection.close(); process.exit(0); });
+process.on('SIGINT', async () => { console.log('SIGINT received, ignoring'); await mongoose.connection.close(); });
+
 
