@@ -2,155 +2,97 @@ const express = require('express');
 const router = express.Router();
 const Listing = require('../models/listings');
 const mongoose = require('mongoose');
-const MarketSample = require('../models/MarketSample');
-const Report = require('../models/Report');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { cloudinary, upload } = require('../config/cloudinary');
 
-// --------------------------------------------------
-// Helpers & upload config
-// --------------------------------------------------
-function getUserId(req) {
-  return (req.headers['x-user-id'] || req.query.userId || '').toString();
-}
-
-// Map common deal type inputs (rent/sale) to schema values 'For Rent' | 'For Sale'
-function mapDealType(input) {
-  if (!input && input !== 0) return null;
-  const raw = input.toString().trim().toLowerCase();
-  if (!raw) return null;
-  const rent = new Set(['rent', 'for rent', 'rental', 'rentals', 'for_rent', 'to let', 'to_let', 'let']);
-  const sale = new Set(['sale', 'sell', 'for sale', 'for_sale', 'selling', 'sellings']);
-  if (rent.has(raw)) return 'For Rent';
-  if (sale.has(raw)) return 'For Sale';
-  // accept already-formatted
-  if (raw === 'for rent') return 'For Rent';
-  if (raw === 'for sale') return 'For Sale';
-  return null;
-}
-
-// Validate if a string is one of the Listing.type categories
-function isListingCategory(value) {
-  const v = (value || '').toString().trim();
-  if (!v) return false;
-  const allowed = new Set(['Apartment', 'Room', 'Sublet', 'Commercial', 'Hostel']);
-  return allowed.has(v) || allowed.has(v.charAt(0).toUpperCase() + v.slice(1).toLowerCase());
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
-  filename: (req, file, cb) => {
-    const safe = (file.originalname || 'file').replace(/\s+/g, '_');
-    cb(null, `${Date.now()}_${safe}`);
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
-
-// Helpers to map a stored URL to a local uploads file path and delete safely
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-function urlToUploadPath(url) {
-  if (!url) return null;
-  try {
-    const u = new URL(url, 'http://localhost'); // base for relative urls
-    const idx = u.pathname.indexOf('/uploads/');
-    if (idx === -1) return null;
-    const rel = decodeURIComponent(u.pathname.substring(idx + '/uploads/'.length));
-    if (!rel || rel.includes('..') || path.isAbsolute(rel)) return null;
-    return path.join(uploadsDir, rel);
-  } catch {
-    return null;
-  }
-}
-
-async function unlinkSafe(filePath) {
-  if (!filePath) return;
-  try {
-    await fs.promises.unlink(filePath);
-  } catch (e) {
-    // ignore if already missing or access issues
-  }
+// Helper to extract Cloudinary public ID from a URL
+function getPublicIdFromUrl(url) {
+    if (!url) return null;
+    try {
+        const parts = url.split('/');
+        const publicIdWithFormat = parts.slice(parts.indexOf('basha-lagbe-listings')).join('/').split('.')[0];
+        return publicIdWithFormat;
+    } catch (e) {
+        console.error('Could not extract public ID from URL:', url, e);
+        return null;
+    }
 }
 
 // Create listing (requires authenticated owner)
 router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
-  try {
-    // The `authenticate` middleware adds the `auth` object to the request.
-    // We MUST use this as the source of truth for the user's identity.
-    const userId = req.auth?.userId;
-    if (!userId) {
-      // This case should ideally not be hit if `authenticate` middleware is working correctly.
-      return res.status(401).json({ error: 'Authentication failed: User ID not found.' });
+    try {
+        const userId = req.auth?.userId;
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication failed: User ID not found.' });
+        }
+
+        const photoUrls = (req.files?.photos || []).map((f) => f.path);
+        const videoUrl = req.files?.video?.[0] ? req.files.video[0].path : '';
+
+        // Basic required validations
+        const missing = [];
+        if (!req.body.title || !req.body.title.trim()) missing.push('title');
+        if (req.body.price === undefined || req.body.price === '') missing.push('price');
+        if (!req.body.type) missing.push('type');
+        if (!req.body.division) missing.push('division');
+        if (!req.body.district) missing.push('district');
+        if (!req.body.subdistrict) missing.push('subdistrict');
+        if (!req.body.area) missing.push('area');
+        if (req.body.propertyType === undefined || req.body.propertyType === '') missing.push('propertyType');
+        if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
+        const floorNum = req.body.floor !== undefined ? Number(req.body.floor) : undefined;
+        if (floorNum === undefined || Number.isNaN(floorNum) || floorNum < 0) missing.push('floor');
+        if (!req.body.availableFrom) missing.push('availableFrom');
+        const roomsNum = req.body.rooms !== undefined ? Number(req.body.rooms) : undefined;
+        if (roomsNum === undefined || Number.isNaN(roomsNum) || roomsNum < 0) missing.push('rooms');
+        if (photoUrls.length === 0) missing.push('photos');
+        if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
+
+        const payload = {
+            ...req.body,
+            userId,
+            price: (() => { const n = Number(req.body.price); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+            rooms: Number(req.body.rooms),
+            bathrooms: req.body.bathrooms ? Number(req.body.bathrooms) : 0,
+            balcony: req.body.balcony ? Number(req.body.balcony) : 0,
+            personCount: req.body.personCount ? Number(req.body.personCount) : 1,
+            isRented: req.body.isRented === 'true' || req.body.isRented === true,
+            features: req.body.features
+                ? req.body.features.split(',').map((s) => s.trim()).filter(Boolean)
+                : [],
+            floor: Number(req.body.floor),
+            totalFloors: req.body.totalFloors ? Number(req.body.totalFloors) : 0,
+            furnishing: req.body.furnishing || 'Unfurnished',
+            deposit: req.body.deposit ? Math.max(0, Number(req.body.deposit)) : 0,
+            serviceCharge: req.body.serviceCharge ? Math.max(0, Number(req.body.serviceCharge)) : 0,
+            negotiable: req.body.negotiable === 'true' || req.body.negotiable === true,
+            utilitiesIncluded: req.body.utilitiesIncluded
+                ? req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean)
+                : [],
+            contactName: req.body.contactName || '',
+            phone: req.body.phone || '',
+            availableFrom: new Date(req.body.availableFrom),
+            photoUrls,
+            videoUrl,
+            sizeSqft: req.body.sizeSqft ? Number(req.body.sizeSqft) : 0,
+        };
+
+        // Optional geo: only accept if within Bangladesh bounds
+        const lat = Number(req.body.lat);
+        const lng = Number(req.body.lng);
+        const inRange = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 20.5 && lat <= 26.7 && lng >= 88 && lng <= 92.7;
+        if (inRange) {
+            payload.lat = lat;
+            payload.lng = lng;
+            payload.location = { type: 'Point', coordinates: [lng, lat] };
+        }
+        const listing = new Listing(payload);
+        const saved = await listing.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        console.error('Create listing error:', err);
+        res.status(500).json({ error: err.message });
     }
-
-    const base = `${req.protocol}://${req.get('host')}`;
-    const photoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-    const videoUrl = req.files?.video?.[0] ? `${base}/uploads/${req.files.video[0].filename}` : '';
-
-    // Basic required validations
-    const missing = [];
-    if (!req.body.title || !req.body.title.trim()) missing.push('title');
-    if (req.body.price === undefined || req.body.price === '') missing.push('price');
-    if (!req.body.type) missing.push('type');
-    if (!req.body.division) missing.push('division');
-    if (!req.body.district) missing.push('district');
-    if (!req.body.subdistrict) missing.push('subdistrict');
-    if (!req.body.area) missing.push('area');
-    if (req.body.propertyType === undefined || req.body.propertyType === '') missing.push('propertyType');
-    if (!req.body.phone || !req.body.phone.trim()) missing.push('phone');
-    const floorNum = req.body.floor !== undefined ? Number(req.body.floor) : undefined;
-    if (floorNum === undefined || Number.isNaN(floorNum) || floorNum < 0) missing.push('floor');
-    if (!req.body.availableFrom) missing.push('availableFrom');
-    const roomsNum = req.body.rooms !== undefined ? Number(req.body.rooms) : undefined;
-    if (roomsNum === undefined || Number.isNaN(roomsNum) || roomsNum < 0) missing.push('rooms');
-    if (photoUrls.length === 0) missing.push('photos');
-    if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
-
-    const payload = {
-      ...req.body,
-      userId,
-      price: (() => { const n = Number(req.body.price); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-  rooms: Number(req.body.rooms),
-      bathrooms: req.body.bathrooms ? Number(req.body.bathrooms) : 0,
-      balcony: req.body.balcony ? Number(req.body.balcony) : 0,
-      personCount: req.body.personCount ? Number(req.body.personCount) : 1,
-      isRented: req.body.isRented === 'true' || req.body.isRented === true,
-      features: req.body.features
-        ? req.body.features.split(',').map((s) => s.trim()).filter(Boolean)
-        : [],
-  floor: Number(req.body.floor),
-      totalFloors: req.body.totalFloors ? Number(req.body.totalFloors) : 0,
-      furnishing: req.body.furnishing || 'Unfurnished',
-      deposit: req.body.deposit ? Math.max(0, Number(req.body.deposit)) : 0,
-      serviceCharge: req.body.serviceCharge ? Math.max(0, Number(req.body.serviceCharge)) : 0,
-      negotiable: req.body.negotiable === 'true' || req.body.negotiable === true,
-      utilitiesIncluded: req.body.utilitiesIncluded
-        ? req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean)
-        : [],
-      contactName: req.body.contactName || '',
-      phone: req.body.phone || '',
-  availableFrom: new Date(req.body.availableFrom),
-    photoUrls,
-  videoUrl,
-    sizeSqft: req.body.sizeSqft ? Number(req.body.sizeSqft) : 0,
-    };
-
-    // Optional geo: only accept if within Bangladesh bounds
-    const lat = Number(req.body.lat);
-    const lng = Number(req.body.lng);
-    const inRange = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 20.5 && lat <= 26.7 && lng >= 88 && lng <= 92.7;
-    if (inRange) {
-      payload.lat = lat;
-      payload.lng = lng;
-      payload.location = { type: 'Point', coordinates: [lng, lat] };
-    }
-    const listing = new Listing(payload);
-    const saved = await listing.save();
-    res.status(201).json(saved);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // --------------------------------------------------
@@ -450,141 +392,139 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// Update listing (only by owner)
+// Update listing (requires authenticated owner of the listing)
 router.put('/:id', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
-  try {
-  const userId = (req.auth && req.auth.userId) || getUserId(req);
-    if (!userId) return res.status(401).json({ error: 'userId required' });
+    try {
+        const { id } = req.params;
+        const userId = req.auth?.userId;
 
-    const doc = await Listing.findOne({ _id: req.params.id, userId });
-    if (!doc) return res.status(404).json({ error: 'Not found or not owner' });
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid listing ID' });
+        }
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication failed: User ID not found.' });
+        }
 
-    const base = `${req.protocol}://${req.get('host')}`;
-    const newPhotoUrls = (req.files?.photos || []).map((f) => `${base}/uploads/${f.filename}`);
-    const keep = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : doc.photoUrls;
+        const listing = await Listing.findById(id);
+        if (!listing) {
+            return res.status(404).json({ error: 'Listing not found' });
+        }
 
-  // Track originals to know what to delete later
-  const originalPhotoUrls = Array.isArray(doc.photoUrls) ? [...doc.photoUrls] : [];
-  const originalVideoUrl = doc.videoUrl || '';
+        // IMPORTANT: Authorize that the user owns this listing
+        if (listing.userId.toString() !== userId) {
+            return res.status(403).json({ error: 'Forbidden: You do not have permission to edit this listing.' });
+        }
 
-    doc.title = req.body.title ?? doc.title;
-    doc.description = req.body.description ?? doc.description;
-    doc.type = req.body.type ?? doc.type;
-    if (typeof req.body.price !== 'undefined') {
-      const n = Number(req.body.price);
-      doc.price = Number.isFinite(n) && n > 0 ? n : 0;
+        const newPhotoUrls = (req.files?.photos || []).map((f) => f.path);
+        
+        let existingPhotoUrls = [];
+        try {
+            existingPhotoUrls = req.body.existingPhotoUrls ? JSON.parse(req.body.existingPhotoUrls) : [];
+        } catch (e) {
+            return res.status(400).json({ error: 'Invalid format for existingPhotoUrls.' });
+        }
+
+        const urlsToDelete = listing.photoUrls.filter(url => !existingPhotoUrls.includes(url));
+        for (const url of urlsToDelete) {
+            const publicId = getPublicIdFromUrl(url);
+            if (publicId) {
+                await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+            }
+        }
+
+        const finalPhotoUrls = [...existingPhotoUrls, ...newPhotoUrls];
+
+        let finalVideoUrl = listing.videoUrl;
+        const removeVideo = req.body.removeVideo === 'true';
+        const newVideoFile = req.files?.video?.[0];
+
+        if (newVideoFile) {
+            if (listing.videoUrl) {
+                const oldPublicId = getPublicIdFromUrl(listing.videoUrl);
+                if (oldPublicId) await cloudinary.uploader.destroy(oldPublicId, { resource_type: 'video' });
+            }
+            finalVideoUrl = newVideoFile.path;
+        } else if (removeVideo) {
+            if (listing.videoUrl) {
+                const oldPublicId = getPublicIdFromUrl(listing.videoUrl);
+                if (oldPublicId) await cloudinary.uploader.destroy(oldPublicId, { resource_type: 'video' });
+            }
+            finalVideoUrl = '';
+        }
+        
+        const updatePayload = {
+            ...req.body,
+            price: Number(req.body.price) || 0,
+            rooms: Number(req.body.rooms) || 0,
+            bathrooms: Number(req.body.bathrooms) || 0,
+            balcony: Number(req.body.balcony) || 0,
+            personCount: Number(req.body.personCount) || 1,
+            floor: Number(req.body.floor) || 0,
+            totalFloors: Number(req.body.totalFloors) || 0,
+            deposit: Number(req.body.deposit) || 0,
+            serviceCharge: Number(req.body.serviceCharge) || 0,
+            sizeSqft: Number(req.body.sizeSqft) || 0,
+            isRented: req.body.isRented === 'true',
+            negotiable: req.body.negotiable === 'true',
+            features: req.body.features ? req.body.features.split(',').map(s => s.trim()).filter(Boolean) : [],
+            utilitiesIncluded: req.body.utilitiesIncluded ? req.body.utilitiesIncluded.split(',').map(s => s.trim()).filter(Boolean) : [],
+            availableFrom: new Date(req.body.availableFrom),
+            photoUrls: finalPhotoUrls,
+            videoUrl: finalVideoUrl,
+        };
+
+        const lat = Number(req.body.lat);
+        const lng = Number(req.body.lng);
+        const inRange = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 20.5 && lat <= 26.7 && lng >= 88 && lng <= 92.7;
+        if (inRange) {
+            updatePayload.lat = lat;
+            updatePayload.lng = lng;
+            updatePayload.location = { type: 'Point', coordinates: [lng, lat] };
+        } else {
+            updatePayload.lat = undefined;
+            updatePayload.lng = undefined;
+            updatePayload.location = undefined;
+        }
+
+        const updatedListing = await Listing.findByIdAndUpdate(id, { $set: updatePayload }, { new: true, runValidators: true });
+
+        if (!updatedListing) {
+            return res.status(404).json({ error: 'Listing not found after update.' });
+        }
+
+        res.status(200).json(updatedListing);
+    } catch (err) {
+        console.error('Update listing error:', err);
+        res.status(500).json({ error: 'An unexpected error occurred during update.', details: err.message });
     }
-  if (req.body.availableFrom) doc.availableFrom = new Date(req.body.availableFrom);
-  if (typeof req.body.rooms !== 'undefined') doc.rooms = Number(req.body.rooms);
-    if (req.body.bathrooms) doc.bathrooms = Number(req.body.bathrooms);
-    if (req.body.balcony) doc.balcony = Number(req.body.balcony);
-    if (req.body.personCount) doc.personCount = Number(req.body.personCount);
-  if (typeof req.body.isRented !== 'undefined') doc.isRented = req.body.isRented === 'true' || req.body.isRented === true;
-    if (req.body.features) doc.features = req.body.features.split(',').map((s) => s.trim()).filter(Boolean);
-  // location removed
-  // Structured address updates
-  if (typeof req.body.division !== 'undefined') doc.division = req.body.division;
-  if (typeof req.body.district !== 'undefined') doc.district = req.body.district;
-  if (typeof req.body.subdistrict !== 'undefined') doc.subdistrict = req.body.subdistrict;
-  if (typeof req.body.area !== 'undefined') doc.area = req.body.area;
-  if (typeof req.body.road !== 'undefined') doc.road = req.body.road;
-  if (typeof req.body.houseNo !== 'undefined') doc.houseNo = req.body.houseNo;
-  if (typeof req.body.floor !== 'undefined') doc.floor = Number(req.body.floor);
-  if (typeof req.body.totalFloors !== 'undefined') doc.totalFloors = Number(req.body.totalFloors) || 0;
-  if (typeof req.body.furnishing !== 'undefined') doc.furnishing = req.body.furnishing;
-  if (typeof req.body.deposit !== 'undefined') doc.deposit = Math.max(0, Number(req.body.deposit)) || 0;
-  if (typeof req.body.serviceCharge !== 'undefined') doc.serviceCharge = Math.max(0, Number(req.body.serviceCharge)) || 0;
-  if (typeof req.body.negotiable !== 'undefined') doc.negotiable = req.body.negotiable === 'true' || req.body.negotiable === true;
-  if (typeof req.body.utilitiesIncluded !== 'undefined') doc.utilitiesIncluded = req.body.utilitiesIncluded.split(',').map((s) => s.trim()).filter(Boolean);
-  if (typeof req.body.contactName !== 'undefined') doc.contactName = req.body.contactName;
-  if (typeof req.body.phone !== 'undefined') doc.phone = req.body.phone;
-  if (typeof req.body.sizeSqft !== 'undefined') doc.sizeSqft = Number(req.body.sizeSqft) || 0;
-
-    // Optional geo updates within Bangladesh
-    if (typeof req.body.lat !== 'undefined' && typeof req.body.lng !== 'undefined') {
-      const lat = Number(req.body.lat);
-      const lng = Number(req.body.lng);
-      const inRange = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 20.5 && lat <= 26.7 && lng >= 88 && lng <= 92.7;
-      if (inRange) {
-        doc.lat = lat; doc.lng = lng;
-        doc.location = { type: 'Point', coordinates: [lng, lat] };
-      }
-    }
-
-    doc.photoUrls = [...keep, ...newPhotoUrls];
-    let removedVideoUrl = '';
-    if (req.files?.video?.[0]) {
-      // Replace with newly uploaded video
-      removedVideoUrl = originalVideoUrl;
-      doc.videoUrl = `${base}/uploads/${req.files.video[0].filename}`;
-    } else if (req.body.removeVideo === 'true') {
-      // Explicitly remove existing video
-      removedVideoUrl = originalVideoUrl;
-      doc.videoUrl = '';
-    } else if (req.body.existingVideoUrl) {
-      // Keep existing video when the client confirms it should remain
-      doc.videoUrl = req.body.existingVideoUrl;
-    }
-
-    // Validate required fields after applying changes
-    const must = {
-      title: doc.title,
-      price: doc.price,
-      type: doc.type,
-      floor: doc.floor,
-      rooms: doc.rooms,
-      availableFrom: doc.availableFrom,
-      division: doc.division,
-      district: doc.district,
-      subdistrict: doc.subdistrict,
-      area: doc.area,
-      phone: doc.phone,
-    };
-    const missing = Object.entries(must).filter(([k, v]) => {
-      if (k === 'floor') return !(typeof v === 'number') || v < 0;
-      if (k === 'rooms') return !(typeof v === 'number') || v < 0;
-      return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
-    }).map(([k]) => k);
-    if (!doc.photoUrls.length) missing.push('photos');
-    if (missing.length) return res.status(400).json({ error: 'Missing required fields', fields: missing });
-
-    const updated = await doc.save();
-
-    // After successful save, delete any removed photos/videos from disk (best effort)
-    const removedPhotos = originalPhotoUrls.filter((u) => !doc.photoUrls.includes(u));
-    const pathsToDelete = [
-      ...removedPhotos.map(urlToUploadPath),
-      urlToUploadPath(removedVideoUrl),
-    ].filter(Boolean);
-    // Fire and forget
-    Promise.all(pathsToDelete.map(unlinkSafe)).catch(() => {});
-
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
-// --------------------------------------------------
 // Delete listing (owner only)
-// --------------------------------------------------
 router.delete('/:id', authenticate, async (req, res) => {
-  try {
-    const userId = (req.auth && req.auth.userId) || getUserId(req);
-    if (!userId) return res.status(401).json({ error: 'userId required' });
+    try {
+        const userId = req.auth?.userId;
+        if (!userId) return res.status(401).json({ error: 'userId required' });
 
-  const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
-  if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });
+        const deleted = await Listing.findOneAndDelete({ _id: req.params.id, userId });
+        if (!deleted) return res.status(404).json({ error: 'Not found or not owner' });
 
-  // Best-effort cleanup of files referenced by the deleted listing
-  const fileUrls = [...(deleted.photoUrls || []), deleted.videoUrl || ''].filter(Boolean);
-  const filePaths = fileUrls.map(urlToUploadPath).filter(Boolean);
-  Promise.all(filePaths.map(unlinkSafe)).catch(() => {});
+        // Cleanup files from Cloudinary
+        const photoPublicIds = (deleted.photoUrls || []).map(getPublicIdFromUrl).filter(Boolean);
+        if (photoPublicIds.length > 0) {
+            await cloudinary.api.delete_resources(photoPublicIds, { resource_type: 'image' });
+        }
+        if (deleted.videoUrl) {
+            const videoPublicId = getPublicIdFromUrl(deleted.videoUrl);
+            if (videoPublicId) {
+                await cloudinary.uploader.destroy(videoPublicId, { resource_type: 'video' });
+            }
+        }
 
-  res.json({ message: 'Listing deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+        res.json({ message: 'Listing deleted' });
+    } catch (err) {
+        console.error('Delete listing error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --------------------------------------------------
