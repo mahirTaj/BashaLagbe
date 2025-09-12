@@ -21,6 +21,8 @@ function getPublicIdFromUrl(url) {
 // Create listing (requires authenticated owner)
 router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
     try {
+    // Debug: log incoming files and a small portion of body to help troubleshoot upload errors
+    try { console.log('Create listing incoming:', { files: Object.keys(req.files || {}).reduce((acc, k) => ({ ...acc, [k]: (req.files[k] || []).length }), {}), bodyKeys: Object.keys(req.body || {}).slice(0,10) }); } catch (e) { console.log('Create listing debug log failed', e); }
         const userId = req.auth?.userId;
         if (!userId) {
             return res.status(401).json({ error: 'Authentication failed: User ID not found.' });
@@ -89,10 +91,12 @@ router.post('/', authenticate, upload.fields([{ name: 'photos', maxCount: 12 }, 
         const listing = new Listing(payload);
         const saved = await listing.save();
         res.status(201).json(saved);
-    } catch (err) {
-        console.error('Create listing error:', err);
-        res.status(500).json({ error: err.message });
-    }
+  } catch (err) {
+    // Ensure we log full error object and stack for debugging
+    try { console.error('Create listing error:', err, '\nstack:\n', err && err.stack); } catch (e) { console.error('Failed to log error object', e); }
+    // If the error has a message, return it; otherwise return generic
+    res.status(500).json({ error: (err && err.message) || 'Server error' });
+  }
 });
 
 // --------------------------------------------------
