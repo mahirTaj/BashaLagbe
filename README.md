@@ -1,4 +1,4 @@
-# BashaLagbe 🏠
+# BashaLagbe (Flat/Room Rental Marketplace) 🏠
 
 A full-stack real estate marketplace for Bangladesh that simplifies property rentals and sales by connecting landlords and tenants directly.
 
